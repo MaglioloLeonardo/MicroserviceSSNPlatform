@@ -1,0 +1,4 @@
+1)DBMS dentro cointainer montato su volume, possibilmente PostGres.
+2)Springboot back end, adozione del pattern MCV con repository che si interfacciano mediante Object Relational Mapping, possibilmente usando la persistance API di Spring Boot.
+3)La front end viene eseguita su un altro server in fase di sviluppo, utilizzando Vue. Fai attenzione al settaggio corretto della backend Cross-Origin Resource Sharing (CORS) in modo tale che non ci siano problemi.
+4)Se è necessario specificare sessioni esse devono sempre esser rese disponibili mediante Cookies settati adeguatamente con Spring boot.

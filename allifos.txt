@@ -1,0 +1,1445 @@
+### File: api-gateway/pom.xml
+----------------------------------------
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>tassproject.backend</groupId>
+        <artifactId>backend</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>api-gateway</artifactId>
+    <packaging>jar</packaging>
+    <name>api-gateway</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+### File: api-gateway/src/main/java/tassproject/apigateway/ApiGatewayApplication.java
+----------------------------------------
+package tassproject.apigateway;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class ApiGatewayApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ApiGatewayApplication.class, args);
+    }
+
+}
+
+
+### File: api-gateway/src/main/resources/application.properties
+----------------------------------------
+spring.application.name=api-gateway
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
+spring.datasource.username=myuser
+spring.datasource.password=secret
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# HikariCP tuning (opzionale)
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=600000
+
+# Porta del server
+server.port=8080
+
+### File: api-gateway/src/test/java/tassproject/apigateway/ApiGatewayApplicationTests.java
+----------------------------------------
+// api-gateway/src/test/java/tassproject/apigateway/ApiGatewayApplicationTests.java
+package tassproject.apigateway;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest(
+        classes = ApiGatewayApplication.class,
+        properties = {
+                // disabilito il verifier che altrimenti blocca la 3.1.4 + Cloud 2023.0.3
+                "spring.cloud.compatibility-verifier.enabled=false"
+        }
+)
+class ApiGatewayApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}
+
+
+### File: common/pom.xml
+----------------------------------------
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>tassproject.backend</groupId>
+        <artifactId>backend</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>common</artifactId>
+    <packaging>jar</packaging>
+    <name>common</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- libreria: niente repackage -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration><skip>true</skip></configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+### File: common/src/main/java/tassproject/common/CommonApplication.java
+----------------------------------------
+package tassproject.backend.common;
+
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
+
+@SpringBootApplication(
+        exclude = {
+                DataSourceAutoConfiguration.class,
+                HibernateJpaAutoConfiguration.class
+        }
+)
+public class CommonApplication {
+    // Questa classe serve solo per il test di context-loading in common
+}
+
+
+### File: common/src/main/resources/application.properties
+----------------------------------------
+spring.application.name=common
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
+spring.datasource.username=myuser
+spring.datasource.password=secret
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# HikariCP tuning (opzionale)
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=600000
+
+# Porta del server
+server.port=8080
+
+
+### File: common/src/test/java/tassproject/common/CommonApplicationTests.java
+----------------------------------------
+package tassproject.common;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import tassproject.backend.common.CommonApplication;
+
+@SpringBootTest(classes = CommonApplication.class)
+class CommonApplicationTests {
+    @Test
+    void contextLoads() {
+    }
+}
+
+
+### File: dispensation-service/pom.xml
+----------------------------------------
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="
+           http://maven.apache.org/POM/4.0.0
+           https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>tassproject.backend</groupId>
+        <artifactId>backend</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>dispensation-service</artifactId>
+    <packaging>jar</packaging>
+    <name>dispensation-service</name>
+
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+
+    <dependencies>
+        <!-- Core -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>tassproject.backend</groupId>
+            <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Testing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Testcontainers core -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>1.18.3</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Testcontainers PostgreSQL module -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>1.18.3</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- JUnit Jupiter integration for Testcontainers -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>1.18.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+
+
+### File: dispensation-service/src/main/java/DispensationRepository.java
+----------------------------------------
+package tassproject.dispensationservice.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.dispensationservice.Dispensation;
+
+import java.util.UUID;
+
+public interface DispensationRepository extends JpaRepository<Dispensation, UUID> {
+}
+
+
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/Dispensation.java
+----------------------------------------
+package tassproject.dispensationservice;
+
+import jakarta.persistence.*;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "dispensations")
+public class Dispensation {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    // Riferimento alla Prescription via UUID, non l’entità JPA di un altro microservizio
+    @Column(name = "prescription_id", nullable = false, columnDefinition = "uuid")
+    private UUID prescriptionId;
+
+    @Column(name = "dispensed_at", nullable = false)
+    private OffsetDateTime dispensedAt;
+
+    @Column(name = "dispensed_by", nullable = false, columnDefinition = "uuid")
+    private UUID dispensedBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Status status;
+
+    public enum Status {
+        DONE,
+        FAILED
+    }
+
+    public Dispensation() {}
+
+    public Dispensation(UUID id, UUID prescriptionId, OffsetDateTime dispensedAt, UUID dispensedBy, Status status) {
+        this.id = id;
+        this.prescriptionId = prescriptionId;
+        this.dispensedAt = dispensedAt;
+        this.dispensedBy = dispensedBy;
+        this.status = status;
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public UUID getPrescriptionId() {
+        return prescriptionId;
+    }
+
+    public void setPrescriptionId(UUID prescriptionId) {
+        this.prescriptionId = prescriptionId;
+    }
+
+    public OffsetDateTime getDispensedAt() {
+        return dispensedAt;
+    }
+
+    public void setDispensedAt(OffsetDateTime dispensedAt) {
+        this.dispensedAt = dispensedAt;
+    }
+
+    public UUID getDispensedBy() {
+        return dispensedBy;
+    }
+
+    public void setDispensedBy(UUID dispensedBy) {
+        this.dispensedBy = dispensedBy;
+    }
+
+    public Status getStatus() {
+        return status;
+    }
+
+    public void setStatus(Status status) {
+        this.status = status;
+    }
+}
+
+
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/DispensationServiceApplication.java
+----------------------------------------
+package tassproject.dispensationservice;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+
+@SpringBootApplication(
+        // Se hai anche componenti (ad es. @Service, @Component) in prescription-service
+        scanBasePackages = {
+                "tassproject.dispensationservice",
+                "tassproject.prescriptionservice"
+        }
+)
+@EntityScan(basePackages = {
+        "tassproject.dispensationservice",     // le tue entità locali
+        "tassproject.prescriptionservice"      // quelle di Prescription
+})
+@EnableJpaRepositories(basePackages = {
+        "tassproject.dispensationservice.repository",   // i repo di Dispensation
+        "tassproject.prescriptionservice.repository"   // i repo di Prescription
+})
+public class DispensationServiceApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(DispensationServiceApplication.class, args);
+    }
+
+}
+
+
+### File: dispensation-service/src/main/resources/application.properties
+----------------------------------------
+spring.application.name=dispensation-service
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
+spring.datasource.username=myuser
+spring.datasource.password=secret
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# HikariCP tuning (opzionale)
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=600000
+
+# Porta del server
+server.port=8080
+
+
+### File: dispensation-service/src/test/java/tassproject/dispensationservice/DispensationRepositoryIT.java
+----------------------------------------
+package tassproject.dispensationservice;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import tassproject.dispensationservice.repository.DispensationRepository;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Testcontainers
+@DataJpaTest
+class DispensationRepositoryIT {
+
+    @Container
+    static PostgreSQLContainer<?> postgres =
+            new PostgreSQLContainer<>("postgres:16-alpine")
+                    .withDatabaseName("db")
+                    .withUsername("user")
+                    .withPassword("pwd");
+
+    @DynamicPropertySource
+    static void overrideProps(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url",      postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+    }
+
+    @Autowired
+    private DispensationRepository repo;
+
+    @Test
+    void saveAndQuery() {
+        var disp = new Dispensation(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                OffsetDateTime.now(),
+                UUID.randomUUID(),
+                Dispensation.Status.DONE
+        );
+        repo.save(disp);
+
+        Assertions.assertEquals(1, repo.findAll().size());
+        Assertions.assertTrue(repo.existsById(disp.getId()));
+    }
+}
+
+
+### File: dispensation-service/src/test/java/tassproject/dispensationservice/DispensationServiceApplicationTests.java
+----------------------------------------
+package tassproject.dispensationservice;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class DispensationServiceApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+}
+
+
+### File: inventory-service/pom.xml
+----------------------------------------
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="
+           http://maven.apache.org/POM/4.0.0
+           https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>tassproject.backend</groupId>
+        <artifactId>backend</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>notification-service</artifactId>
+    <packaging>jar</packaging>
+
+    <name>notification-service</name>
+    <description>Email / RabbitMQ notifications</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>tassproject.backend</groupId>
+            <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryItem.java
+----------------------------------------
+package tassproject.inventoryservice;
+
+import jakarta.persistence.*;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "inventory_items")
+public class InventoryItem {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    @Column(name = "drug_id", nullable = false, columnDefinition = "uuid")
+    private UUID drugId;
+
+    @Column(name = "available_quantity", nullable = false)
+    private int availableQuantity;
+
+    @Column(name = "last_updated", nullable = false)
+    private OffsetDateTime lastUpdated;
+
+    // costruttori, getter e setter...
+}
+
+
+### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryServiceApplication.java
+----------------------------------------
+package tassproject.inventoryservice;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class InventoryServiceApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(InventoryServiceApplication.class, args);
+    }
+
+}
+
+
+### File: inventory-service/src/main/resources/application.properties
+----------------------------------------
+spring.application.name=inventory-service
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
+spring.datasource.username=myuser
+spring.datasource.password=secret
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# HikariCP tuning (opzionale)
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=600000
+
+# Porta del server
+server.port=8080
+
+
+### File: inventory-service/src/test/java/tassproject/inventoryservice/InventoryItemRepositoryIT.java
+----------------------------------------
+package tassproject.inventoryservice;
+
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import tassproject.inventoryservice.repository.InventoryItemRepository;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Testcontainers
+@DataJpaTest
+class InventoryItemRepositoryIT {
+
+    @Container
+    static PostgreSQLContainer<?> postgres =
+            new PostgreSQLContainer<>("postgres:16-alpine")
+                    .withDatabaseName("db")
+                    .withUsername("user")
+                    .withPassword("pwd");
+
+    @DynamicPropertySource
+    static void props(DynamicPropertyRegistry r) {
+        r.add("spring.datasource.url", postgres::getJdbcUrl);
+        r.add("spring.datasource.username", postgres::getUsername);
+        r.add("spring.datasource.password", postgres::getPassword);
+    }
+
+    @Autowired
+    InventoryItemRepository repo;
+
+    @Test
+    void positiveStockUpdate() {
+        var row = new InventoryItem();
+        row.setId(UUID.randomUUID());
+        row.setDrugId(UUID.randomUUID());
+        row.setAvailableQuantity(10);
+        row.setLastUpdated(OffsetDateTime.now());
+
+        repo.save(row);
+
+        var loaded = repo.findById(row.getId()).orElseThrow();
+        loaded.setAvailableQuantity(loaded.getAvailableQuantity() + 5);
+        repo.save(loaded);
+
+        Assertions.assertEquals(15, repo.findById(row.getId()).orElseThrow().getAvailableQuantity());
+    }
+}
+
+
+### File: inventory-service/src/test/java/tassproject/inventoryservice/InventoryServiceApplicationTests.java
+----------------------------------------
+package tassproject.inventoryservice;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class InventoryServiceApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}
+
+
+### File: notification-service/pom.xml
+----------------------------------------
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.3</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>tassproject</groupId>
+    <artifactId>notification-service</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>notification-service</name>
+    <description>notification-service</description>
+    <url/>
+    <licenses>
+        <license/>
+    </licenses>
+    <developers>
+        <developer/>
+    </developers>
+    <scm>
+        <connection/>
+        <developerConnection/>
+        <tag/>
+        <url/>
+    </scm>
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>tassproject</groupId>
+            <artifactId>common</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+
+
+### File: notification-service/src/main/java/tassproject/notificationservice/NotificationServiceApplication.java
+----------------------------------------
+package tassproject.notificationservice;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class NotificationServiceApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(NotificationServiceApplication.class, args);
+    }
+
+}
+
+
+### File: notification-service/src/main/resources/application.properties
+----------------------------------------
+spring.application.name=notification-service
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
+spring.datasource.username=myuser
+spring.datasource.password=secret
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# HikariCP tuning (opzionale)
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=600000
+
+# Porta del server
+server.port=8080
+
+
+### File: notification-service/src/test/java/tassproject/notificationservice/NotificationServiceApplicationTests.java
+----------------------------------------
+package tassproject.notificationservice;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class NotificationServiceApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}
+
+
+### File: pom.xml
+----------------------------------------
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="
+           http://maven.apache.org/POM/4.0.0
+           https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 1) Estendiamo Spring Boot Starter Parent per pluginManagement -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.1.4</version>
+        <relativePath/> <!-- non cercare pom locale -->
+    </parent>
+
+    <!-- 2) Coordinate del modulo aggregatore -->
+    <groupId>tassproject.backend</groupId>
+    <artifactId>backend</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>TAAS Backend Aggregator</name>
+    <description>Aggregatore dei microservizi backend per TAAS</description>
+
+    <!-- 3) Proprietà condivise -->
+    <properties>
+        <java.version>17</java.version>
+        <spring-boot.version>3.1.4</spring-boot.version>
+        <spring-cloud.version>2023.0.3</spring-cloud.version>
+    </properties>
+
+    <!-- 4) Import dei BOM di Spring Boot e Spring Cloud -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- 5) I moduli figli di questo aggregatore -->
+    <modules>
+        <module>common</module>
+        <module>api-gateway</module>
+        <module>prescription-service</module>
+        <module>dispensation-service</module>
+        <module>inventory-service</module>
+        <module>notification-service</module>
+    </modules>
+
+</project>
+
+
+### File: prescription-service/pom.xml
+----------------------------------------
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>tassproject.backend</groupId>
+        <artifactId>backend</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>prescription-service</artifactId>
+    <packaging>jar</packaging>
+    <name>prescription-service</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>tassproject.backend</groupId>
+            <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Testcontainers -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/Prescription.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import jakarta.persistence.*;
+import java.time.OffsetDateTime;
+import java.util.*;
+
+@Entity
+@Table(name = "prescriptions")
+public class Prescription {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    @Column(name = "doctor_id", nullable = false, columnDefinition = "uuid")
+    private UUID doctorId;
+
+    @Column(name = "patient_id", nullable = false, columnDefinition = "uuid")
+    private UUID patientId;
+
+    @Column(name = "issued_at", nullable = false)
+    private OffsetDateTime issuedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Status status;
+
+    @Column(name = "exemption", nullable = false)
+    private boolean exemption; // true = esente ticket, false = non esente
+
+    @Column(name = "therapy_duration")
+    private String therapyDuration; // Es: "7 giorni" (mappato direttamente per semplicità)
+
+    @OneToMany(
+            mappedBy = "prescription",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    private List<PrescriptionItem> items = new ArrayList<>();
+
+    // --- Enum Stato Ricetta ---
+    public enum Status {
+        OPEN,
+        DISPENSED,
+        COMPLETED,
+        CANCELLED
+    }
+
+    // --- Costruttori ---
+    protected Prescription() {} // richiesto da JPA
+
+    public Prescription(UUID id, UUID doctorId, UUID patientId, OffsetDateTime issuedAt, boolean exemption, String therapyDuration, List<PrescriptionItem> items) {
+        this.id = id;
+        this.doctorId = doctorId;
+        this.patientId = patientId;
+        this.issuedAt = issuedAt;
+        this.status = Status.OPEN;
+        this.exemption = exemption;
+        this.therapyDuration = therapyDuration;
+        setItems(items); // associa gli items a questa prescription
+    }
+
+    // Factory per nuove prescrizioni
+    public static Prescription create(UUID doctorId, UUID patientId, boolean exemption, String therapyDuration, List<PrescriptionItem> items) {
+        return new Prescription(UUID.randomUUID(), doctorId, patientId, OffsetDateTime.now(), exemption, therapyDuration, items);
+    }
+
+    // --- Metodi dominio ---
+    public boolean isOpen() {
+        return status == Status.OPEN;
+    }
+
+    public boolean isCompleted() {
+        return status == Status.COMPLETED;
+    }
+
+    public boolean isDispensed() {
+        return status == Status.DISPENSED;
+    }
+
+    public boolean isCancelled() {
+        return status == Status.CANCELLED;
+    }
+
+    public void markDispensed() {
+        if (!isOpen()) throw new IllegalStateException("Prescription must be OPEN to be dispensed.");
+        this.status = Status.DISPENSED;
+    }
+
+    public void markCompleted() {
+        if (status != Status.DISPENSED) throw new IllegalStateException("Prescription must be DISPENSED to complete.");
+        this.status = Status.COMPLETED;
+    }
+
+    public void cancel() {
+        if (isCompleted()) throw new IllegalStateException("Cannot cancel a completed prescription.");
+        this.status = Status.CANCELLED;
+    }
+
+    // --- Getter e Setter ---
+    public UUID getId() { return id; }
+    public UUID getDoctorId() { return doctorId; }
+    public UUID getPatientId() { return patientId; }
+    public OffsetDateTime getIssuedAt() { return issuedAt; }
+    public Status getStatus() { return status; }
+    public boolean isExemption() { return exemption; }
+    public String getTherapyDuration() { return therapyDuration; }
+    public List<PrescriptionItem> getItems() { return items; }
+
+    public void setItems(List<PrescriptionItem> items) {
+        this.items.clear();
+        if (items != null) {
+            for (PrescriptionItem item : items) {
+                item.setPrescription(this); // imposta il back-reference
+                this.items.add(item);
+            }
+        }
+    }
+
+    // Opzionale: aggiungi utility per frontend
+    public String getEsenzioneAsString() {
+        return exemption ? "Si" : "No";
+    }
+}
+
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionItem.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import jakarta.persistence.*;
+import java.util.UUID;
+
+@Entity
+@Table(name = "prescription_items")
+public class PrescriptionItem {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "prescription_id", nullable = false, columnDefinition = "uuid")
+    private Prescription prescription;
+
+    @Column(name = "drug_id", nullable = false, columnDefinition = "uuid")
+    private UUID drugId;
+
+    @Column(name = "active_ingredient", nullable = false)
+    private String activeIngredient; // Es: "Paracetamolo"
+
+    @Column(nullable = false)
+    private String dosage; // Es: "500mg"
+
+    @Column(nullable = false)
+    private int quantity; // Numero confezioni o unità
+
+    // --- Costruttori ---
+    protected PrescriptionItem() {
+        // JPA only
+    }
+
+    public PrescriptionItem(UUID drugId, String activeIngredient, String dosage, int quantity) {
+        this.id = UUID.randomUUID();
+        this.drugId = drugId;
+        this.activeIngredient = activeIngredient;
+        this.dosage = dosage;
+        this.quantity = quantity;
+    }
+
+    // --- Getter e Setter ---
+    public UUID getId() {
+        return id;
+    }
+
+    public Prescription getPrescription() {
+        return prescription;
+    }
+
+    public void setPrescription(Prescription prescription) {
+        this.prescription = prescription;
+    }
+
+    public UUID getDrugId() {
+        return drugId;
+    }
+
+    public void setDrugId(UUID drugId) {
+        this.drugId = drugId;
+    }
+
+    public String getActiveIngredient() {
+        return activeIngredient;
+    }
+
+    public void setActiveIngredient(String activeIngredient) {
+        this.activeIngredient = activeIngredient;
+    }
+
+    public String getDosage() {
+        return dosage;
+    }
+
+    public void setDosage(String dosage) {
+        this.dosage = dosage;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
+    // --- Utility per frontend/DTO ---
+    public String getDescrizionePrincipioAttivo() {
+        return activeIngredient + " " + dosage;
+    }
+
+    // --- equals/hashCode opzionali per correttezza in collezioni ---
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof PrescriptionItem)) return false;
+        PrescriptionItem that = (PrescriptionItem) o;
+        return id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
+}
+
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionItemRepository.java
+----------------------------------------
+// PrescriptionItemRepository.java
+package tassproject.prescriptionservice.repository;
+
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.prescriptionservice.PrescriptionItem;
+
+public interface PrescriptionItemRepository extends JpaRepository<PrescriptionItem, UUID> { }
+
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionRepository.java
+----------------------------------------
+// PrescriptionRepository.java
+package tassproject.prescriptionservice.repository;
+
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.prescriptionservice.Prescription;
+
+public interface PrescriptionRepository extends JpaRepository<Prescription, UUID> { }
+
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionServiceApplication.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class PrescriptionServiceApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(PrescriptionServiceApplication.class, args);
+    }
+
+}
+
+
+### File: prescription-service/src/main/resources/application.properties
+----------------------------------------
+spring.application.name=prescription-service
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
+spring.datasource.username=myuser
+spring.datasource.password=secret
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# HikariCP tuning (opzionale)
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=600000
+
+# Porta del server
+server.port=8080
+
+
+### File: prescription-service/src/test/java/tassproject/prescriptionservice/PrescriptionRepositoryIT.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import tassproject.prescriptionservice.repository.PrescriptionRepository;
+import tassproject.prescriptionservice.repository.PrescriptionItemRepository;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Testcontainers
+@DataJpaTest
+class PrescriptionRepositoryIT {
+
+    @Container
+    static PostgreSQLContainer<?> postgres =
+            new PostgreSQLContainer<>("postgres:16-alpine")
+                    .withDatabaseName("db")
+                    .withUsername("user")
+                    .withPassword("pwd");
+
+    @DynamicPropertySource
+    static void overrideProps(DynamicPropertyRegistry r) {
+        r.add("spring.datasource.url", postgres::getJdbcUrl);
+        r.add("spring.datasource.username", postgres::getUsername);
+        r.add("spring.datasource.password", postgres::getPassword);
+    }
+
+    @Autowired
+    PrescriptionRepository prescriptions;
+
+    @Autowired
+    PrescriptionItemRepository items;
+
+    @Test
+    void crudEndToEnd() {
+        // --- create ---
+        var item  = new PrescriptionItem(UUID.randomUUID(), "Paracetamolo", "500mg", 2);
+        var presc = Prescription.create(UUID.randomUUID(), UUID.randomUUID(), false,
+                "7 giorni", List.of(item));
+        presc = prescriptions.save(presc);
+
+        Assertions.assertNotNull(presc.getId());
+        Assertions.assertEquals(1, presc.getItems().size());
+
+        // --- read ---
+        var found = prescriptions.findById(presc.getId()).orElseThrow();
+        Assertions.assertEquals(presc.getDoctorId(), found.getDoctorId());
+
+        // --- update ---
+        found.markDispensed();
+        prescriptions.save(found);
+        Assertions.assertTrue(prescriptions.findById(found.getId()).orElseThrow().isDispensed());
+
+        // --- delete (cascata su items) ---
+        prescriptions.delete(found);
+        Assertions.assertTrue(prescriptions.findAll().isEmpty());
+        Assertions.assertTrue(items.findAll().isEmpty());
+    }
+}
+
+
+### File: prescription-service/src/test/java/tassproject/prescriptionservice/PrescriptionServiceApplicationTests.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class PrescriptionServiceApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}
+
+
+### File: src/main/java/tassproject/backend/BackendApplication.java
+----------------------------------------
+package tassproject.backend;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class BackendApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(BackendApplication.class, args);
+    }
+
+}
+
+
+### File: src/main/resources/application.properties
+----------------------------------------
+spring.application.name=backend
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
+spring.datasource.username=myuser
+spring.datasource.password=secret
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# HikariCP tuning (opzionale)
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=600000
+
+# Porta del server
+server.port=8080
+
+### File: src/test/java/tassproject/backend/BackendApplicationTests.java
+----------------------------------------
+package tassproject.backend;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class BackendApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}
+
+
