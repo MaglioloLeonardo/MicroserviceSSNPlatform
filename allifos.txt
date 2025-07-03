@@ -290,6 +290,14 @@ class CommonApplicationTests {
             <version>1.18.3</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -316,6 +324,15 @@ import java.util.UUID;
 public interface DispensationRepository extends JpaRepository<Dispensation, UUID> {
 }
 
+
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/CreateDispensationRequest.java
+----------------------------------------
+package tassproject.dispensationservice;
+
+import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
+
+public record CreateDispensationRequest(@NotNull UUID prescriptionId, @NotNull UUID dispensedBy) {}
 
 ### File: dispensation-service/src/main/java/tassproject/dispensationservice/Dispensation.java
 ----------------------------------------
@@ -403,6 +420,109 @@ public class Dispensation {
     }
 }
 
+
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/DispensationApplicationService.java
+----------------------------------------
+package tassproject.dispensationservice;
+
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tassproject.dispensationservice.repository.DispensationRepository;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@Transactional
+public class DispensationApplicationService {
+
+    private final DispensationRepository repo;
+    private final RabbitTemplate rabbitTemplate;
+
+    @Autowired
+    public DispensationApplicationService(DispensationRepository repo,
+                                          RabbitTemplate rabbitTemplate) {
+        this.repo = repo;
+        this.rabbitTemplate = rabbitTemplate;
+    }
+
+    public DispensationResponse dispense(CreateDispensationRequest request) {
+        var entity = new Dispensation(
+                UUID.randomUUID(),
+                request.prescriptionId(),
+                OffsetDateTime.now(),
+                request.dispensedBy(),
+                Dispensation.Status.DONE
+        );
+        entity = repo.save(entity);
+        rabbitTemplate.convertAndSend(
+                "dispensation.events",
+                "PrescriptionDispensed",
+                entity.getPrescriptionId()
+        );
+        return DispensationResponse.from(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DispensationResponse> listByPrescription(UUID prescriptionId) {
+        return repo.findAll().stream()
+                .filter(d -> d.getPrescriptionId().equals(prescriptionId))
+                .map(DispensationResponse::from)
+                .toList();
+    }
+}
+
+
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/DispensationController.java
+----------------------------------------
+package tassproject.dispensationservice;
+
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1")
+public class DispensationController {
+
+    private final DispensationApplicationService service;
+
+    // Costruttore esplicito con service iniettato da Spring
+    public DispensationController(DispensationApplicationService service) {
+        this.service = service;
+    }
+
+    @PostMapping("/dispensations")
+    @ResponseStatus(HttpStatus.CREATED)
+    public DispensationResponse dispense(@Valid @RequestBody CreateDispensationRequest request) {
+        return service.dispense(request);
+    }
+
+    @GetMapping("/prescriptions/{prescriptionId}/dispensations")
+    public List<DispensationResponse> list(@PathVariable UUID prescriptionId) {
+        return service.listByPrescription(prescriptionId);
+    }
+}
+
+
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/DispensationResponse.java
+----------------------------------------
+package tassproject.dispensationservice;
+
+import tassproject.dispensationservice.Dispensation;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+public record DispensationResponse(UUID id, UUID prescriptionId, OffsetDateTime dispensedAt, UUID dispensedBy, Dispensation.Status status) {
+    public static DispensationResponse from(Dispensation d) {
+        return new DispensationResponse(d.getId(), d.getPrescriptionId(), d.getDispensedAt(), d.getDispensedBy(), d.getStatus());
+    }
+}
 
 ### File: dispensation-service/src/main/java/tassproject/dispensationservice/DispensationServiceApplication.java
 ----------------------------------------
@@ -532,14 +652,15 @@ class DispensationServiceApplicationTests {
 
 ### File: inventory-service/pom.xml
 ----------------------------------------
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="
-           http://maven.apache.org/POM/4.0.0
-           https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- ereditiamo dal parent aggregator -->
     <parent>
         <groupId>tassproject.backend</groupId>
         <artifactId>backend</artifactId>
@@ -547,46 +668,149 @@ class DispensationServiceApplicationTests {
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>notification-service</artifactId>
+    <artifactId>inventory-service</artifactId>
     <packaging>jar</packaging>
+    <name>inventory-service</name>
 
-    <name>notification-service</name>
-    <description>Email / RabbitMQ notifications</description>
+    <properties>
+        <java.version>17</java.version>
+        <testcontainers.version>1.18.3</testcontainers.version>
+    </properties>
 
     <dependencies>
+        <!-- Core dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-amqp</artifactId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>tassproject.backend</groupId>
             <artifactId>common</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <!-- Test dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.26</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <!-- per generare le annotation prima della compilazione -->
             <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.26</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
+            <!-- ... eventuale spring-boot-maven-plugin ... -->
         </plugins>
     </build>
+
 </project>
+
+
+### File: inventory-service/src/main/java/tassproject/inventoryservice/AvailabilityResponse.java
+----------------------------------------
+package tassproject.inventoryservice;
+
+import java.util.UUID;
+
+public record AvailabilityResponse(UUID drugId, int quantity) {}
+
+### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryApplicationService.java
+----------------------------------------
+package tassproject.inventoryservice.application;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tassproject.inventoryservice.dto.AvailabilityResponse;
+import tassproject.inventoryservice.repository.InventoryItemRepository;
+
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class InventoryApplicationService {
+    private final InventoryItemRepository repo;
+
+    public AvailabilityResponse checkAvailability(UUID drugId) {
+        var qty = repo.findAll().stream()
+                .filter(i -> i.getDrugId().equals(drugId))
+                .mapToInt(i -> i.getAvailableQuantity())
+                .sum();
+        return new AvailabilityResponse(drugId, qty);
+    }
+}
+
+### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryController.java
+----------------------------------------
+package tassproject.inventoryservice.api;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+import tassproject.inventoryservice.application.InventoryApplicationService;
+import tassproject.inventoryservice.dto.AvailabilityResponse;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1")
+@RequiredArgsConstructor
+public class InventoryController {
+    private final InventoryApplicationService service;
+
+    @GetMapping("/inventory/{drugId}/availability")
+    public AvailabilityResponse availability(@PathVariable UUID drugId) {
+        return service.checkAvailability(drugId);
+    }
+}
 
 
 ### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryItem.java
@@ -614,8 +838,59 @@ public class InventoryItem {
     @Column(name = "last_updated", nullable = false)
     private OffsetDateTime lastUpdated;
 
-    // costruttori, getter e setter...
+    // **Costruttore vuoto richiesto da JPA**
+    public InventoryItem() {}
+
+    // (Opzionale) costruttore full-args
+    public InventoryItem(UUID id, UUID drugId, int availableQuantity, OffsetDateTime lastUpdated) {
+        this.id = id;
+        this.drugId = drugId;
+        this.availableQuantity = availableQuantity;
+        this.lastUpdated = lastUpdated;
+    }
+
+    // --- Getter e Setter ---
+    public UUID getId() {
+        return id;
+    }
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public UUID getDrugId() {
+        return drugId;
+    }
+    public void setDrugId(UUID drugId) {
+        this.drugId = drugId;
+    }
+
+    public int getAvailableQuantity() {
+        return availableQuantity;
+    }
+    public void setAvailableQuantity(int availableQuantity) {
+        this.availableQuantity = availableQuantity;
+    }
+
+    public OffsetDateTime getLastUpdated() {
+        return lastUpdated;
+    }
+    public void setLastUpdated(OffsetDateTime lastUpdated) {
+        this.lastUpdated = lastUpdated;
+    }
 }
+
+
+### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryItemRepository.java
+----------------------------------------
+// inventory-service/src/main/java/tassproject/inventoryservice/repository/InventoryItemRepository.java
+package tassproject.inventoryservice.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.inventoryservice.InventoryItem;
+
+import java.util.UUID;
+
+public interface InventoryItemRepository extends JpaRepository<InventoryItem, UUID> {}
 
 
 ### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryServiceApplication.java
@@ -793,6 +1068,31 @@ class InventoryServiceApplicationTests {
 </project>
 
 
+### File: notification-service/src/main/java/tassproject/notificationservice/NotificationController.java
+----------------------------------------
+package tassproject.notificationservice.api;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import tassproject.notificationservice.dto.SendNotificationRequest;
+
+@RestController
+@RequestMapping("/api/v1")
+@RequiredArgsConstructor
+public class NotificationController {
+    private final RabbitTemplate rabbitTemplate;
+
+    @PostMapping("/notifications")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void notify(@Valid @RequestBody SendNotificationRequest request) {
+        rabbitTemplate.convertAndSend("notification.events", request.type().name(), request);
+    }
+}
+
+
 ### File: notification-service/src/main/java/tassproject/notificationservice/NotificationServiceApplication.java
 ----------------------------------------
 package tassproject.notificationservice;
@@ -809,6 +1109,18 @@ public class NotificationServiceApplication {
 
 }
 
+
+### File: notification-service/src/main/java/tassproject/notificationservice/SendNotificationRequest.java
+----------------------------------------
+package tassproject.notificationservice;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
+
+public record SendNotificationRequest(@NotNull UUID recipientId, @NotBlank String message, @NotNull Type type) {
+    public enum Type { INFO, WARNING, ERROR }
+}
 
 ### File: notification-service/src/main/resources/application.properties
 ----------------------------------------
@@ -986,6 +1298,10 @@ class NotificationServiceApplicationTests {
             <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
 
     </dependencies>
 
@@ -999,6 +1315,23 @@ class NotificationServiceApplicationTests {
     </build>
 </project>
 
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/CreatePrescriptionRequest.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import java.util.UUID;
+
+public record CreatePrescriptionRequest(
+        @NotNull UUID doctorId,
+        @NotNull UUID patientId,
+        String therapyDuration,
+        boolean exemption,
+        @Size(min = 1) List<@NotNull PrescriptionItemDto> items
+) {}
 
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/Prescription.java
 ----------------------------------------
@@ -1129,6 +1462,145 @@ public class Prescription {
 }
 
 
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionApplicationService.java
+----------------------------------------
+package tassproject.prescriptionservice.application;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import tassproject.prescriptionservice.CreatePrescriptionRequest;
+import tassproject.prescriptionservice.PrescriptionResponse;
+import tassproject.prescriptionservice.Prescription;
+import tassproject.prescriptionservice.PrescriptionItem;
+import tassproject.prescriptionservice.repository.PrescriptionRepository;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@Transactional
+public class PrescriptionApplicationService {
+    private final PrescriptionRepository repo;
+    private final RabbitTemplate rabbitTemplate;
+
+    // ← il costruttore esplicito che inizializza i final fields
+    public PrescriptionApplicationService(PrescriptionRepository repo,
+                                          RabbitTemplate rabbitTemplate) {
+        this.repo = repo;
+        this.rabbitTemplate = rabbitTemplate;
+    }
+
+    public PrescriptionResponse create(CreatePrescriptionRequest req) {
+        var items = req.items().stream()
+                .map(dto -> new PrescriptionItem(
+                        dto.drugId(),
+                        dto.activeIngredient(),
+                        dto.dosage(),
+                        dto.quantity()))
+                .toList();
+
+        var entity = Prescription.create(
+                req.doctorId(),
+                req.patientId(),
+                req.exemption(),
+                req.therapyDuration(),
+                items);
+
+        entity = repo.save(entity);
+        rabbitTemplate.convertAndSend(
+                "prescription.events",
+                "PrescriptionCreated",
+                entity.getId());
+
+        return PrescriptionResponse.from(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public PrescriptionResponse findById(UUID id) {
+        return repo.findById(id)
+                .map(PrescriptionResponse::from)
+                .orElseThrow();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PrescriptionResponse> findActiveByPatientId(UUID patientId) {
+        return repo.findAll().stream()
+                .filter(p -> p.getPatientId().equals(patientId))
+                .filter(p -> p.getStatus() == Prescription.Status.OPEN
+                        || p.getStatus() == Prescription.Status.DISPENSED)
+                .map(PrescriptionResponse::from)
+                .toList();
+    }
+
+    public PrescriptionResponse updateStatus(UUID id, Prescription.Status newStatus) {
+        var entity = repo.findById(id).orElseThrow();
+        switch (newStatus) {
+            case DISPENSED   -> entity.markDispensed();
+            case COMPLETED   -> entity.markCompleted();
+            case CANCELLED   -> entity.cancel();
+            default          -> throw new IllegalStateException(
+                    "Unsupported status transition");
+        }
+        repo.save(entity);
+        rabbitTemplate.convertAndSend(
+                "prescription.events",
+                "PrescriptionStatusChanged",
+                entity.getId());
+
+        return PrescriptionResponse.from(entity);
+    }
+}
+
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionController.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import tassproject.prescriptionservice.application.PrescriptionApplicationService;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1")
+public class PrescriptionController {
+
+    private final PrescriptionApplicationService service;
+
+    // Costruttore esplicito per l’injection del service
+    public PrescriptionController(PrescriptionApplicationService service) {
+        this.service = service;
+    }
+
+    @PostMapping("/prescriptions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public PrescriptionResponse create(@Valid @RequestBody CreatePrescriptionRequest request) {
+        return service.create(request);
+    }
+
+    @GetMapping("/prescriptions/{id}")
+    public PrescriptionResponse findById(@PathVariable UUID id) {
+        return service.findById(id);
+    }
+
+    @GetMapping("/patients/{patientId}/prescriptions/active")
+    public List<PrescriptionResponse> findActive(@PathVariable UUID patientId) {
+        return service.findActiveByPatientId(patientId);
+    }
+
+    @PutMapping("/prescriptions/{id}/status")
+    public PrescriptionResponse updateStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdatePrescriptionStatusRequest body) {
+        return service.updateStatus(id, body.newStatus());
+    }
+}
+
+
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionItem.java
 ----------------------------------------
 package tassproject.prescriptionservice;
@@ -1239,6 +1711,22 @@ public class PrescriptionItem {
 }
 
 
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionItemDto.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
+
+public record PrescriptionItemDto(
+        @NotNull UUID drugId,
+        @NotBlank String activeIngredient,
+        @NotBlank String dosage,
+        @Min(1) int quantity
+) {}
+
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionItemRepository.java
 ----------------------------------------
 // PrescriptionItemRepository.java
@@ -1263,6 +1751,42 @@ import tassproject.prescriptionservice.Prescription;
 public interface PrescriptionRepository extends JpaRepository<Prescription, UUID> { }
 
 
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionResponse.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import tassproject.prescriptionservice.Prescription;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+public record PrescriptionResponse(
+        UUID id,
+        UUID doctorId,
+        UUID patientId,
+        OffsetDateTime issuedAt,
+        Prescription.Status status,
+        boolean exemption,
+        String therapyDuration,
+        List<PrescriptionItemDto> items
+) {
+    public static PrescriptionResponse from(Prescription p) {
+        return new PrescriptionResponse(
+                p.getId(),
+                p.getDoctorId(),
+                p.getPatientId(),
+                p.getIssuedAt(),
+                p.getStatus(),
+                p.isExemption(),
+                p.getTherapyDuration(),
+                p.getItems().stream()
+                        .map(it -> new PrescriptionItemDto(it.getDrugId(), it.getActiveIngredient(), it.getDosage(), it.getQuantity()))
+                        .toList()
+        );
+    }
+}
+
+
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionServiceApplication.java
 ----------------------------------------
 package tassproject.prescriptionservice;
@@ -1279,6 +1803,15 @@ public class PrescriptionServiceApplication {
 
 }
 
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/UpdatePrescriptionStatusRequest.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import jakarta.validation.constraints.NotNull;
+import tassproject.prescriptionservice.Prescription;
+
+public record UpdatePrescriptionStatusRequest(@NotNull Prescription.Status newStatus) {}
 
 ### File: prescription-service/src/main/resources/application.properties
 ----------------------------------------
