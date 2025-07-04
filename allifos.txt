@@ -63,23 +63,27 @@ public class ApiGatewayApplication {
 
 ### File: api-gateway/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=api-gateway
-spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
-spring.datasource.username=myuser
-spring.datasource.password=secret
+spring.application.name=dispensation-service   # cambia il nome
+server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
-spring.jpa.hibernate.ddl-auto=update
+spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
-# HikariCP tuning (opzionale)
+# esponi via HTTP gli endpoint health e info
+management.endpoints.web.exposure.include=health,info
+
+
+# HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
 spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
 
-# Porta del server
-server.port=8080
 
 ### File: api-gateway/src/test/java/tassproject/apigateway/ApiGatewayApplicationTests.java
 ----------------------------------------
@@ -182,23 +186,26 @@ public class CommonApplication {
 
 ### File: common/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=common
-spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
-spring.datasource.username=myuser
-spring.datasource.password=secret
+spring.application.name=dispensation-service   # cambia il nome
+server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
-spring.jpa.hibernate.ddl-auto=update
+spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
-# HikariCP tuning (opzionale)
+# esponi via HTTP gli endpoint health e info
+management.endpoints.web.exposure.include=health,info
+
+
+# HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
 spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
-
-# Porta del server
-server.port=8080
 
 
 ### File: common/src/test/java/tassproject/common/CommonApplicationTests.java
@@ -298,6 +305,12 @@ class CommonApplicationTests {
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
         </dependency>
+        <!-- Actuator per health-check -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -559,23 +572,26 @@ public class DispensationServiceApplication {
 
 ### File: dispensation-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=dispensation-service
-spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
-spring.datasource.username=myuser
-spring.datasource.password=secret
+spring.application.name=dispensation-service   # cambia il nome
+server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
-spring.jpa.hibernate.ddl-auto=update
+spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
-# HikariCP tuning (opzionale)
+# esponi via HTTP gli endpoint health e info
+management.endpoints.web.exposure.include=health,info
+
+
+# HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
 spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
-
-# Porta del server
-server.port=8080
 
 
 ### File: dispensation-service/src/test/java/tassproject/dispensationservice/DispensationRepositoryIT.java
@@ -728,6 +744,10 @@ class DispensationServiceApplicationTests {
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -747,7 +767,21 @@ class DispensationServiceApplicationTests {
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- ... eventuale spring-boot-maven-plugin ... -->
+
+            <!-- Spring Boot: rende il jar auto-avviabile -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+                <executions>
+                    <!-- aggiunge il MANIFEST con Main-Class -->
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
@@ -912,23 +946,26 @@ public class InventoryServiceApplication {
 
 ### File: inventory-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=inventory-service
-spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
-spring.datasource.username=myuser
-spring.datasource.password=secret
+spring.application.name=dispensation-service   # cambia il nome
+server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
-spring.jpa.hibernate.ddl-auto=update
+spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
-# HikariCP tuning (opzionale)
+# esponi via HTTP gli endpoint health e info
+management.endpoints.web.exposure.include=health,info
+
+
+# HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
 spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
-
-# Porta del server
-server.port=8080
 
 
 ### File: inventory-service/src/test/java/tassproject/inventoryservice/InventoryItemRepositoryIT.java
@@ -1068,6 +1105,12 @@ class InventoryServiceApplicationTests {
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Actuator per health-check -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -1196,23 +1239,26 @@ public record SendNotificationRequest(@NotNull UUID recipientId, @NotBlank Strin
 
 ### File: notification-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=notification-service
-spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
-spring.datasource.username=myuser
-spring.datasource.password=secret
+spring.application.name=dispensation-service   # cambia il nome
+server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
-spring.jpa.hibernate.ddl-auto=update
+spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
-# HikariCP tuning (opzionale)
+# esponi via HTTP gli endpoint health e info
+management.endpoints.web.exposure.include=health,info
+
+
+# HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
 spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
-
-# Porta del server
-server.port=8080
 
 
 ### File: notification-service/src/test/java/tassproject/notificationservice/NotificationServiceApplicationTests.java
@@ -1261,14 +1307,21 @@ class NotificationServiceApplicationTests {
 
     <!-- 3) Proprietà condivise -->
     <properties>
+        <!-- Java & Spring versions -->
         <java.version>17</java.version>
         <spring-boot.version>3.1.4</spring-boot.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
+
+        <!-- Driver & utility libs -->
+        <postgresql.version>42.6.0</postgresql.version>
+        <lombok.version>1.18.38</lombok.version>
+        <testcontainers.version>1.18.3</testcontainers.version>
     </properties>
 
-    <!-- 4) Import dei BOM di Spring Boot e Spring Cloud -->
+    <!-- 4) Import dei BOM di Spring Boot e Spring Cloud + gestione versioni comuni -->
     <dependencyManagement>
         <dependencies>
+            <!-- Spring Boot dependencies BOM -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
@@ -1276,6 +1329,7 @@ class NotificationServiceApplicationTests {
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Spring Cloud dependencies BOM -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
@@ -1283,10 +1337,75 @@ class NotificationServiceApplicationTests {
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
+            <!-- Versione gestita del driver PostgreSQL -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+
+            <!-- Lombok (annotation processing) -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+            </dependency>
+
+            <!-- Testcontainers -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers</artifactId>
+                <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
-    <!-- 5) I moduli figli di questo aggregatore -->
+    <!-- 4b) Dipendenze comuni ereditate dai moduli -->
+    <dependencies>
+        <!-- Driver JDBC PostgreSQL disponibile a runtime -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- 5) Configurazione centralizzata dei plugin Maven -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Compiler plugin per Java 17 + lombok -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+
+                <!-- Spring Boot Maven Plugin -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <!-- 6) Moduli figli -->
     <modules>
         <module>common</module>
         <module>api-gateway</module>
@@ -1887,23 +2006,26 @@ public record UpdatePrescriptionStatusRequest(@NotNull Prescription.Status newSt
 
 ### File: prescription-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=prescription-service
-spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
-spring.datasource.username=myuser
-spring.datasource.password=secret
+spring.application.name=dispensation-service   # cambia il nome
+server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
-spring.jpa.hibernate.ddl-auto=update
+spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
-# HikariCP tuning (opzionale)
+# esponi via HTTP gli endpoint health e info
+management.endpoints.web.exposure.include=health,info
+
+
+# HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
 spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
-
-# Porta del server
-server.port=8080
 
 
 ### File: prescription-service/src/test/java/tassproject/prescriptionservice/PrescriptionRepositoryIT.java
@@ -2023,6 +2145,10 @@ spring.datasource.driver-class-name=org.postgresql.Driver
 
 spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# esponi via HTTP gli endpoint health e info
+management.endpoints.web.exposure.include=health,info
+
 
 # HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
