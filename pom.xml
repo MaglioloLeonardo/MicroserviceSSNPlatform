@@ -25,14 +25,21 @@
 
     <!-- 3) Proprietà condivise -->
     <properties>
+        <!-- Java & Spring versions -->
         <java.version>17</java.version>
         <spring-boot.version>3.1.4</spring-boot.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
+
+        <!-- Driver & utility libs -->
+        <postgresql.version>42.6.0</postgresql.version>
+        <lombok.version>1.18.38</lombok.version>
+        <testcontainers.version>1.18.3</testcontainers.version>
     </properties>
 
-    <!-- 4) Import dei BOM di Spring Boot e Spring Cloud -->
+    <!-- 4) Import dei BOM di Spring Boot e Spring Cloud + gestione versioni comuni -->
     <dependencyManagement>
         <dependencies>
+            <!-- Spring Boot dependencies BOM -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
@@ -40,6 +47,7 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Spring Cloud dependencies BOM -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
@@ -47,10 +55,75 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
+            <!-- Versione gestita del driver PostgreSQL -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+
+            <!-- Lombok (annotation processing) -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+            </dependency>
+
+            <!-- Testcontainers -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers</artifactId>
+                <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
-    <!-- 5) I moduli figli di questo aggregatore -->
+    <!-- 4b) Dipendenze comuni ereditate dai moduli -->
+    <dependencies>
+        <!-- Driver JDBC PostgreSQL disponibile a runtime -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- 5) Configurazione centralizzata dei plugin Maven -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Compiler plugin per Java 17 + lombok -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+
+                <!-- Spring Boot Maven Plugin -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <!-- 6) Moduli figli -->
     <modules>
         <module>common</module>
         <module>api-gateway</module>

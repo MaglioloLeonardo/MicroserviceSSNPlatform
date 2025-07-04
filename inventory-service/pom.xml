@@ -74,6 +74,10 @@
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -93,7 +97,21 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- ... eventuale spring-boot-maven-plugin ... -->
+
+            <!-- Spring Boot: rende il jar auto-avviabile -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+                <executions>
+                    <!-- aggiunge il MANIFEST con Main-Class -->
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
