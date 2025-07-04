@@ -18,29 +18,35 @@ public class PrescriptionItem {
     @Column(name = "drug_id", nullable = false, columnDefinition = "uuid")
     private UUID drugId;
 
+    @Column(name = "active_ingredient_id", nullable = false, columnDefinition = "uuid")
+    private UUID activeIngredientId;
+
     @Column(name = "active_ingredient", nullable = false)
-    private String activeIngredient; // Es: "Paracetamolo"
+    private String activeIngredient;
 
     @Column(nullable = false)
-    private String dosage; // Es: "500mg"
+    private String dosage;
 
     @Column(nullable = false)
-    private int quantity; // Numero confezioni o unità
+    private int quantity;
 
-    // --- Costruttori ---
     protected PrescriptionItem() {
-        // JPA only
+        // per JPA
     }
 
-    public PrescriptionItem(UUID drugId, String activeIngredient, String dosage, int quantity) {
+    public PrescriptionItem(UUID drugId,
+                            UUID activeIngredientId,
+                            String activeIngredient,
+                            String dosage,
+                            int quantity) {
         this.id = UUID.randomUUID();
         this.drugId = drugId;
+        this.activeIngredientId = activeIngredientId;
         this.activeIngredient = activeIngredient;
         this.dosage = dosage;
         this.quantity = quantity;
     }
 
-    // --- Getter e Setter ---
     public UUID getId() {
         return id;
     }
@@ -59,6 +65,14 @@ public class PrescriptionItem {
 
     public void setDrugId(UUID drugId) {
         this.drugId = drugId;
+    }
+
+    public UUID getActiveIngredientId() {
+        return activeIngredientId;
+    }
+
+    public void setActiveIngredientId(UUID activeIngredientId) {
+        this.activeIngredientId = activeIngredientId;
     }
 
     public String getActiveIngredient() {
@@ -85,12 +99,10 @@ public class PrescriptionItem {
         this.quantity = quantity;
     }
 
-    // --- Utility per frontend/DTO ---
     public String getDescrizionePrincipioAttivo() {
         return activeIngredient + " " + dosage;
     }
 
-    // --- equals/hashCode opzionali per correttezza in collezioni ---
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

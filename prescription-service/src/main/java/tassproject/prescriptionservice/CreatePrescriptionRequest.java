@@ -10,5 +10,5 @@ public record CreatePrescriptionRequest(
         @NotNull UUID patientId,
         String therapyDuration,
         boolean exemption,
-        @Size(min = 1) List<@NotNull PrescriptionItemDto> items
+        @NotNull @Size(min = 1) List<PrescriptionItemDto> items
 ) {}

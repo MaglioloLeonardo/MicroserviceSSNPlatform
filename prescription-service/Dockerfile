@@ -1,14 +1,27 @@
-# === build stage ===
-FROM maven:3.8.5-openjdk-17 AS build
+# ==================================================
+# 🏗️ BUILD STAGE
+# ==================================================
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /workspace
 
-# 1) Copio wrapper (se li usi) e POM aggregatore
-COPY .mvn        .mvn
-COPY mvnw        mvnw
+# 1️⃣ Wrapper Maven + POM aggregatore
+COPY .mvn/           .mvn
+COPY mvnw            mvnw
 RUN chmod +x mvnw
-COPY pom.xml     .
+COPY pom.xml         pom.xml
 
-# 2) Copio **tutti** i moduli
+# 2️⃣ Copio i POM di tutti i moduli per prime dipendenze
+COPY common/pom.xml               common/pom.xml
+COPY api-gateway/pom.xml          api-gateway/pom.xml
+COPY dispensation-service/pom.xml dispensation-service/pom.xml
+COPY inventory-service/pom.xml    inventory-service/pom.xml
+COPY notification-service/pom.xml notification-service/pom.xml
+COPY prescription-service/pom.xml prescription-service/pom.xml
+
+# Scarico tutte le dipendenze in anticipo
+RUN ./mvnw -B dependency:go-offline
+
+# 3️⃣ Copio l’intero sorgente
 COPY common                 common
 COPY api-gateway            api-gateway
 COPY dispensation-service   dispensation-service
@@ -16,14 +29,36 @@ COPY inventory-service      inventory-service
 COPY notification-service   notification-service
 COPY prescription-service   prescription-service
 
-# 3) Build solo prescription-service e i suoi moduli “amici”
-RUN mvn clean package \
-      -pl prescription-service \
-      -am \
-      -DskipTests
+# 4️⃣ Compilo solo prescription-service (+ dipendenze interne) e skippo i test
+RUN ./mvnw -B clean package \
+       -pl prescription-service \
+       -am \
+       -DskipTests
 
-# === runtime stage ===
+# ==================================================
+# 🚀 RUNTIME STAGE
+# ==================================================
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
+
+# Serve wget per healthcheck
+USER root
+RUN apk add --no-cache wget
+
+# Copio il jar
 COPY --from=build /workspace/prescription-service/target/*.jar app.jar
-ENTRYPOINT ["java","-jar","app.jar"]
+
+# Creo utente non-root
+RUN addgroup --system spring && adduser --system --ingroup spring spring
+USER spring:spring
+
+# Espongo porta e definisco healthcheck
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=2s \
+  CMD wget -qO- http://localhost:8080/actuator/health \
+      | grep '"status":"UP"' || exit 1
+
+# Permette di passare opzioni JVM via env
+ENV JAVA_OPTS=""
+
+ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar app.jar"]

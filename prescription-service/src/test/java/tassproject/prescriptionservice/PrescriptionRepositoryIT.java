@@ -42,8 +42,20 @@ class PrescriptionRepositoryIT {
     @Test
     void crudEndToEnd() {
         // --- create ---
-        var item  = new PrescriptionItem(UUID.randomUUID(), "Paracetamolo", "500mg", 2);
-        var presc = Prescription.create(UUID.randomUUID(), UUID.randomUUID(), false,
+        UUID drugId = UUID.randomUUID();
+        UUID activeIngredientId = UUID.randomUUID();
+        String activeIngredient = "Paracetamolo";
+        String dosage = "500mg";
+        int quantity = 2;
+        var item = new PrescriptionItem(
+                drugId,
+                activeIngredientId,
+                activeIngredient,
+                dosage,
+                quantity
+        );
+        var presc = Prescription.create(
+                UUID.randomUUID(), UUID.randomUUID(), false,
                 "7 giorni", List.of(item));
         presc = prescriptions.save(presc);
 

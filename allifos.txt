@@ -63,26 +63,15 @@ public class ApiGatewayApplication {
 
 ### File: api-gateway/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=dispensation-service   # cambia il nome
-server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+spring.application.name=api-gateway
+server.port=${SERVER_PORT:8080}
 
-spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
-spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
-spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
-spring.datasource.driver-class-name=org.postgresql.Driver
+# (NO JDBC: questo servizio non usa database direttamente)
+# (NO JPA)
+# (NO HikariCP)
 
-spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
-
-# esponi via HTTP gli endpoint health e info
+# Health endpoint
 management.endpoints.web.exposure.include=health,info
-
-
-# HikariCP (opzionale)
-spring.datasource.hikari.maximum-pool-size=10
-spring.datasource.hikari.minimum-idle=2
-spring.datasource.hikari.idle-timeout=300000
-spring.datasource.hikari.max-lifetime=600000
 
 
 ### File: api-gateway/src/test/java/tassproject/apigateway/ApiGatewayApplicationTests.java
@@ -186,26 +175,8 @@ public class CommonApplication {
 
 ### File: common/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=dispensation-service   # cambia il nome
-server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
-
-spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
-spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
-spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
-spring.datasource.driver-class-name=org.postgresql.Driver
-
-spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
-
-# esponi via HTTP gli endpoint health e info
-management.endpoints.web.exposure.include=health,info
-
-
-# HikariCP (opzionale)
-spring.datasource.hikari.maximum-pool-size=10
-spring.datasource.hikari.minimum-idle=2
-spring.datasource.hikari.idle-timeout=300000
-spring.datasource.hikari.max-lifetime=600000
+# common module (library, no HTTP exposed)
+spring.application.name=common
 
 
 ### File: common/src/test/java/tassproject/common/CommonApplicationTests.java
@@ -570,10 +541,52 @@ public class DispensationServiceApplication {
 }
 
 
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/RabbitConfig.java
+----------------------------------------
+package tassproject.dispensationservice;
+
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Exchange;
+import org.springframework.amqp.core.ExchangeBuilder;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class RabbitConfig {
+
+    @Bean
+    public Exchange dispensationExchange() {
+        return ExchangeBuilder
+                .topicExchange("dispensation.events")
+                .durable(true)
+                .build();
+    }
+
+    @Bean
+    public Queue dispensationQueue() {
+        return QueueBuilder
+                .durable("dispensation.queue")
+                .build();
+    }
+
+    @Bean
+    public Binding bindDispensationEvents(Queue dispensationQueue, Exchange dispensationExchange) {
+        return BindingBuilder
+                .bind(dispensationQueue)
+                .to(dispensationExchange)
+                .with("#")
+                .noargs();
+    }
+}
+
+
 ### File: dispensation-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=dispensation-service   # cambia il nome
-server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+spring.application.name=dispensation-service
+server.port=${SERVER_PORT:8080}
 
 spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
 spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
@@ -582,10 +595,9 @@ spring.datasource.driver-class-name=org.postgresql.Driver
 
 spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.default_schema=dispensation_service 
 
-# esponi via HTTP gli endpoint health e info
 management.endpoints.web.exposure.include=health,info
-
 
 # HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
@@ -803,34 +815,53 @@ package tassproject.inventoryservice;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tassproject.inventoryservice.AvailabilityResponse;
 import tassproject.inventoryservice.repository.InventoryItemRepository;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional
 public class InventoryApplicationService {
+
     private final InventoryItemRepository repo;
 
+    /* ──────────────────────── lettura ──────────────────────── */
+
+    @Transactional(readOnly = true)
     public AvailabilityResponse checkAvailability(UUID drugId) {
-        var qty = repo.findAll().stream()
+        int qty = repo.findAll().stream()
                 .filter(i -> i.getDrugId().equals(drugId))
-                .mapToInt(i -> i.getAvailableQuantity())
+                .mapToInt(InventoryItem::getAvailableQuantity)
                 .sum();
         return new AvailabilityResponse(drugId, qty);
     }
+
+    /* ──────────────────────── scrittura ─────────────────────── */
+
+    public void reserve(UUID drugId, int quantity, String reason) {
+        var row = repo.findAll().stream()
+                .filter(i -> i.getDrugId().equals(drugId))
+                .findFirst()
+                .orElseGet(() -> new InventoryItem(
+                        UUID.randomUUID(), drugId, 0, OffsetDateTime.now()));
+
+        row.setAvailableQuantity(Math.max(0, row.getAvailableQuantity() - quantity));
+        row.setLastUpdated(OffsetDateTime.now());
+        repo.save(row);
+        // (eventuale publish Rabbit o log, se necessario)
+    }
 }
+
 
 ### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryController.java
 ----------------------------------------
 package tassproject.inventoryservice;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import tassproject.inventoryservice.InventoryApplicationService;
-import tassproject.inventoryservice.AvailabilityResponse;
 
 import java.util.UUID;
 
@@ -838,11 +869,21 @@ import java.util.UUID;
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
 public class InventoryController {
+
     private final InventoryApplicationService service;
 
     @GetMapping("/inventory/{drugId}/availability")
     public AvailabilityResponse availability(@PathVariable UUID drugId) {
         return service.checkAvailability(drugId);
+    }
+
+    /* ─────────────── nuovo endpoint “reserve” ─────────────── */
+
+    @PostMapping("/inventory/items/{drugId}/reserve")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void reserve(@PathVariable UUID drugId,
+                        @RequestBody ReserveInventoryRequest body) {
+        service.reserve(drugId, body.quantity(), body.reason());
     }
 }
 
@@ -944,10 +985,22 @@ public class InventoryServiceApplication {
 }
 
 
+### File: inventory-service/src/main/java/tassproject/inventoryservice/ReserveInventoryRequest.java
+----------------------------------------
+package tassproject.inventoryservice;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+
+public record ReserveInventoryRequest(
+        @Min(1) int quantity,
+        @NotBlank String reason) {}
+
+
 ### File: inventory-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=dispensation-service   # cambia il nome
-server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+spring.application.name=inventory-service
+server.port=${SERVER_PORT:8080}
 
 spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
 spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
@@ -956,10 +1009,9 @@ spring.datasource.driver-class-name=org.postgresql.Driver
 
 spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.default_schema=inventory_service
 
-# esponi via HTTP gli endpoint health e info
 management.endpoints.web.exposure.include=health,info
-
 
 # HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
@@ -1231,16 +1283,23 @@ package tassproject.notificationservice;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.io.Serializable;          // 👈 nuovo import
 import java.util.UUID;
 
-public record SendNotificationRequest(@NotNull UUID recipientId, @NotBlank String message, @NotNull Type type) {
+public record SendNotificationRequest(
+        @NotNull  UUID  recipientId,
+        @NotBlank String message,
+        @NotNull  Type   type)
+        implements Serializable {     // 👈 implementa Serializable
+
     public enum Type { INFO, WARNING, ERROR }
 }
 
+
 ### File: notification-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=dispensation-service   # cambia il nome
-server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+spring.application.name=notification-service
+server.port=${SERVER_PORT:8080}
 
 spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
 spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
@@ -1249,10 +1308,9 @@ spring.datasource.driver-class-name=org.postgresql.Driver
 
 spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.default_schema=notification_service
 
-# esponi via HTTP gli endpoint health e info
 management.endpoints.web.exposure.include=health,info
-
 
 # HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
@@ -1493,6 +1551,11 @@ class NotificationServiceApplicationTests {
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
 
     </dependencies>
 
@@ -1521,8 +1584,30 @@ public record CreatePrescriptionRequest(
         @NotNull UUID patientId,
         String therapyDuration,
         boolean exemption,
-        @Size(min = 1) List<@NotNull PrescriptionItemDto> items
+        @NotNull @Size(min = 1) List<PrescriptionItemDto> items
 ) {}
+
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/GlobalExceptionHandler.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+
+@ControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleException(Exception ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorDTO("Server error", ex.getMessage()));
+    }
+
+    record ErrorDTO(String error, String details) {}
+}
+
 
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/Prescription.java
 ----------------------------------------
@@ -1660,10 +1745,6 @@ package tassproject.prescriptionservice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import tassproject.prescriptionservice.CreatePrescriptionRequest;
-import tassproject.prescriptionservice.PrescriptionResponse;
-import tassproject.prescriptionservice.Prescription;
-import tassproject.prescriptionservice.PrescriptionItem;
 import tassproject.prescriptionservice.repository.PrescriptionRepository;
 
 import java.util.List;
@@ -1675,7 +1756,6 @@ public class PrescriptionApplicationService {
     private final PrescriptionRepository repo;
     private final RabbitTemplate rabbitTemplate;
 
-    // ← il costruttore esplicito che inizializza i final fields
     public PrescriptionApplicationService(PrescriptionRepository repo,
                                           RabbitTemplate rabbitTemplate) {
         this.repo = repo;
@@ -1683,15 +1763,16 @@ public class PrescriptionApplicationService {
     }
 
     public PrescriptionResponse create(CreatePrescriptionRequest req) {
-        var items = req.items().stream()
+        List<PrescriptionItem> items = req.items().stream()
                 .map(dto -> new PrescriptionItem(
                         dto.drugId(),
+                        dto.activeIngredientId(),
                         dto.activeIngredient(),
                         dto.dosage(),
                         dto.quantity()))
                 .toList();
 
-        var entity = Prescription.create(
+        Prescription entity = Prescription.create(
                 req.doctorId(),
                 req.patientId(),
                 req.exemption(),
@@ -1725,20 +1806,18 @@ public class PrescriptionApplicationService {
     }
 
     public PrescriptionResponse updateStatus(UUID id, Prescription.Status newStatus) {
-        var entity = repo.findById(id).orElseThrow();
+        Prescription entity = repo.findById(id).orElseThrow();
         switch (newStatus) {
-            case DISPENSED   -> entity.markDispensed();
-            case COMPLETED   -> entity.markCompleted();
-            case CANCELLED   -> entity.cancel();
-            default          -> throw new IllegalStateException(
-                    "Unsupported status transition");
+            case DISPENSED -> entity.markDispensed();
+            case COMPLETED -> entity.markCompleted();
+            case CANCELLED -> entity.cancel();
+            default -> throw new IllegalStateException("Unsupported status transition");
         }
         repo.save(entity);
         rabbitTemplate.convertAndSend(
                 "prescription.events",
                 "PrescriptionStatusChanged",
                 entity.getId());
-
         return PrescriptionResponse.from(entity);
     }
 }
@@ -1814,29 +1893,35 @@ public class PrescriptionItem {
     @Column(name = "drug_id", nullable = false, columnDefinition = "uuid")
     private UUID drugId;
 
+    @Column(name = "active_ingredient_id", nullable = false, columnDefinition = "uuid")
+    private UUID activeIngredientId;
+
     @Column(name = "active_ingredient", nullable = false)
-    private String activeIngredient; // Es: "Paracetamolo"
+    private String activeIngredient;
 
     @Column(nullable = false)
-    private String dosage; // Es: "500mg"
+    private String dosage;
 
     @Column(nullable = false)
-    private int quantity; // Numero confezioni o unità
+    private int quantity;
 
-    // --- Costruttori ---
     protected PrescriptionItem() {
-        // JPA only
+        // per JPA
     }
 
-    public PrescriptionItem(UUID drugId, String activeIngredient, String dosage, int quantity) {
+    public PrescriptionItem(UUID drugId,
+                            UUID activeIngredientId,
+                            String activeIngredient,
+                            String dosage,
+                            int quantity) {
         this.id = UUID.randomUUID();
         this.drugId = drugId;
+        this.activeIngredientId = activeIngredientId;
         this.activeIngredient = activeIngredient;
         this.dosage = dosage;
         this.quantity = quantity;
     }
 
-    // --- Getter e Setter ---
     public UUID getId() {
         return id;
     }
@@ -1855,6 +1940,14 @@ public class PrescriptionItem {
 
     public void setDrugId(UUID drugId) {
         this.drugId = drugId;
+    }
+
+    public UUID getActiveIngredientId() {
+        return activeIngredientId;
+    }
+
+    public void setActiveIngredientId(UUID activeIngredientId) {
+        this.activeIngredientId = activeIngredientId;
     }
 
     public String getActiveIngredient() {
@@ -1881,12 +1974,10 @@ public class PrescriptionItem {
         this.quantity = quantity;
     }
 
-    // --- Utility per frontend/DTO ---
     public String getDescrizionePrincipioAttivo() {
         return activeIngredient + " " + dosage;
     }
 
-    // --- equals/hashCode opzionali per correttezza in collezioni ---
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -1913,10 +2004,12 @@ import java.util.UUID;
 
 public record PrescriptionItemDto(
         @NotNull UUID drugId,
+        @NotNull UUID activeIngredientId,
         @NotBlank String activeIngredient,
         @NotBlank String dosage,
         @Min(1) int quantity
 ) {}
+
 
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionItemRepository.java
 ----------------------------------------
@@ -1946,7 +2039,6 @@ public interface PrescriptionRepository extends JpaRepository<Prescription, UUID
 ----------------------------------------
 package tassproject.prescriptionservice;
 
-import tassproject.prescriptionservice.Prescription;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -1971,7 +2063,12 @@ public record PrescriptionResponse(
                 p.isExemption(),
                 p.getTherapyDuration(),
                 p.getItems().stream()
-                        .map(it -> new PrescriptionItemDto(it.getDrugId(), it.getActiveIngredient(), it.getDosage(), it.getQuantity()))
+                        .map(it -> new PrescriptionItemDto(
+                                it.getDrugId(),
+                                it.getActiveIngredientId(),
+                                it.getActiveIngredient(),
+                                it.getDosage(),
+                                it.getQuantity()))
                         .toList()
         );
     }
@@ -1995,6 +2092,48 @@ public class PrescriptionServiceApplication {
 }
 
 
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/RabbitConfig.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Exchange;
+import org.springframework.amqp.core.ExchangeBuilder;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class RabbitConfig {
+
+    @Bean
+    public Exchange prescriptionExchange() {
+        return ExchangeBuilder
+                .topicExchange("prescription.events")
+                .durable(true)
+                .build();
+    }
+
+    @Bean
+    public Queue prescriptionQueue() {
+        return QueueBuilder
+                .durable("prescription.queue")
+                .build();
+    }
+
+    @Bean
+    public Binding bindPrescriptionEvents(Queue prescriptionQueue, Exchange prescriptionExchange) {
+        return BindingBuilder
+                .bind(prescriptionQueue)
+                .to(prescriptionExchange)
+                .with("#")
+                .noargs();
+    }
+}
+
+
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/UpdatePrescriptionStatusRequest.java
 ----------------------------------------
 package tassproject.prescriptionservice;
@@ -2006,8 +2145,8 @@ public record UpdatePrescriptionStatusRequest(@NotNull Prescription.Status newSt
 
 ### File: prescription-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=dispensation-service   # cambia il nome
-server.port=${SERVER_PORT:8080}               # fallback 8080, sovrascrivi in compose
+spring.application.name=prescription-service
+server.port=${SERVER_PORT:8080}
 
 spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
 spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
@@ -2016,16 +2155,24 @@ spring.datasource.driver-class-name=org.postgresql.Driver
 
 spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.default_schema=prescription_service
 
-# esponi via HTTP gli endpoint health e info
 management.endpoints.web.exposure.include=health,info
-
 
 # HikariCP (opzionale)
 spring.datasource.hikari.maximum-pool-size=10
 spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
+
+spring.flyway.schemas=prescription_service
+
+
+### File: prescription-service/src/main/resources/db/migration/V1__drop_foreign_keys.sql
+----------------------------------------
+-- Rimuove (se esiste) il vincolo che blocca l'inserimento
+ALTER TABLE IF EXISTS prescription_service.prescriptions
+    DROP CONSTRAINT IF EXISTS prescriptions_doctor_id_fkey;
 
 
 ### File: prescription-service/src/test/java/tassproject/prescriptionservice/PrescriptionRepositoryIT.java
@@ -2074,8 +2221,20 @@ class PrescriptionRepositoryIT {
     @Test
     void crudEndToEnd() {
         // --- create ---
-        var item  = new PrescriptionItem(UUID.randomUUID(), "Paracetamolo", "500mg", 2);
-        var presc = Prescription.create(UUID.randomUUID(), UUID.randomUUID(), false,
+        UUID drugId = UUID.randomUUID();
+        UUID activeIngredientId = UUID.randomUUID();
+        String activeIngredient = "Paracetamolo";
+        String dosage = "500mg";
+        int quantity = 2;
+        var item = new PrescriptionItem(
+                drugId,
+                activeIngredientId,
+                activeIngredient,
+                dosage,
+                quantity
+        );
+        var presc = Prescription.create(
+                UUID.randomUUID(), UUID.randomUUID(), false,
                 "7 giorni", List.of(item));
         presc = prescriptions.save(presc);
 

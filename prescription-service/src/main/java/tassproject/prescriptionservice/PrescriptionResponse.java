@@ -1,6 +1,5 @@
 package tassproject.prescriptionservice;
 
-import tassproject.prescriptionservice.Prescription;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -25,7 +24,12 @@ public record PrescriptionResponse(
                 p.isExemption(),
                 p.getTherapyDuration(),
                 p.getItems().stream()
-                        .map(it -> new PrescriptionItemDto(it.getDrugId(), it.getActiveIngredient(), it.getDosage(), it.getQuantity()))
+                        .map(it -> new PrescriptionItemDto(
+                                it.getDrugId(),
+                                it.getActiveIngredientId(),
+                                it.getActiveIngredient(),
+                                it.getDosage(),
+                                it.getQuantity()))
                         .toList()
         );
     }

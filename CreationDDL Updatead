@@ -1,0 +1,161 @@
+-- ====================================================
+-- DDL UNIFICATO: schemi e tabelle per tutti i servizi
+-- ====================================================
+
+-- 1) Pulizia eventuali tabelle residue in public
+DROP TABLE IF EXISTS
+    public.prescription_items,
+    public.prescriptions,
+    public.dispensations,
+    public.inventory_items
+    CASCADE;
+
+-- 2) Creazione schemi isolati per microservizio
+CREATE SCHEMA IF NOT EXISTS anagrafica_service;
+CREATE SCHEMA IF NOT EXISTS pharma_service;
+CREATE SCHEMA IF NOT EXISTS prescription_service;
+CREATE SCHEMA IF NOT EXISTS dispensation_service;
+CREATE SCHEMA IF NOT EXISTS inventory_service;
+
+-- 3) Creazione tabelle nel loro schema
+
+-- 3.1) anagrafica_service: cittadini e ruoli
+CREATE TABLE IF NOT EXISTS anagrafica_service.citizens (
+    id UUID PRIMARY KEY,
+    cf VARCHAR(16) UNIQUE NOT NULL,
+    nome VARCHAR(100) NOT NULL,
+    cognome VARCHAR(100) NOT NULL,
+    data_nascita DATE NOT NULL,
+    luogo_nascita VARCHAR(100),
+    citta_residenza VARCHAR(100),
+    tipo_utente VARCHAR(16) NOT NULL
+        CHECK (tipo_utente IN ('PAZIENTE','MEDICO','FARMACISTA','ADMIN'))
+);
+
+CREATE TABLE IF NOT EXISTS anagrafica_service.patients (
+    id UUID PRIMARY KEY
+        REFERENCES anagrafica_service.citizens(id) ON DELETE CASCADE,
+    peso DECIMAL(5,2),
+    altezza DECIMAL(5,2)
+);
+
+CREATE TABLE IF NOT EXISTS anagrafica_service.doctors (
+    id UUID PRIMARY KEY
+        REFERENCES anagrafica_service.citizens(id) ON DELETE CASCADE,
+    specializzazione VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS anagrafica_service.pharmacists (
+    id UUID PRIMARY KEY
+        REFERENCES anagrafica_service.citizens(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS anagrafica_service.ssn_admins (
+    id UUID PRIMARY KEY
+        REFERENCES anagrafica_service.citizens(id) ON DELETE CASCADE
+);
+
+
+-- 3.2) pharma_service: famiglie, principi attivi, farmaci
+CREATE TABLE IF NOT EXISTS pharma_service.pharma_families (
+    id UUID PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL,
+    descrizione TEXT
+);
+
+CREATE TABLE IF NOT EXISTS pharma_service.active_ingredients (
+    id UUID PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL,
+    descrizione TEXT,
+    famiglia_id UUID
+        REFERENCES pharma_service.pharma_families(id)
+);
+
+CREATE TABLE IF NOT EXISTS pharma_service.drugs (
+    id UUID PRIMARY KEY,
+    nome_commerciale VARCHAR(255) NOT NULL,
+    produttore VARCHAR(255),
+    modo_somministrazione VARCHAR(255),
+    prezzo DECIMAL(10,2) NOT NULL,
+    principio_attivo_id UUID
+        REFERENCES pharma_service.active_ingredients(id)
+);
+
+
+-- 3.3) prescription_service: prescrizioni e righe
+CREATE TABLE IF NOT EXISTS prescription_service.prescriptions (
+    id UUID PRIMARY KEY,
+    doctor_id UUID NOT NULL
+        REFERENCES anagrafica_service.doctors(id),
+    patient_id UUID NOT NULL
+        REFERENCES anagrafica_service.patients(id),
+    issued_at TIMESTAMPTZ NOT NULL,
+    status VARCHAR(16) NOT NULL
+        CHECK (status IN ('OPEN','DISPENSED','COMPLETED','CANCELLED')),
+    exemption BOOLEAN NOT NULL,
+    therapy_duration VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS prescription_service.prescription_items (
+    id UUID PRIMARY KEY,
+    prescription_id UUID NOT NULL
+        REFERENCES prescription_service.prescriptions(id) ON DELETE CASCADE,
+    drug_id UUID NOT NULL
+        REFERENCES pharma_service.drugs(id),
+    active_ingredient_id UUID NOT NULL
+        REFERENCES pharma_service.active_ingredients(id),
+    active_ingredient VARCHAR(255) NOT NULL,          -- aggiunta per Hibernate
+    dosage VARCHAR(100) NOT NULL,
+    quantity INT NOT NULL CHECK (quantity > 0)
+);
+
+
+-- 3.4) dispensation_service: erogazioni
+CREATE TABLE IF NOT EXISTS dispensation_service.dispensations (
+    id UUID PRIMARY KEY,
+    prescription_id UUID NOT NULL
+        REFERENCES prescription_service.prescriptions(id),
+    dispensed_at TIMESTAMPTZ NOT NULL,
+    dispensed_by UUID NOT NULL
+        REFERENCES anagrafica_service.pharmacists(id),
+    status VARCHAR(8) NOT NULL
+        CHECK (status IN ('DONE','FAILED'))
+);
+
+
+-- 3.5) inventory_service: stock farmaci
+CREATE TABLE IF NOT EXISTS inventory_service.inventory_items (
+    id UUID PRIMARY KEY,
+    drug_id UUID NOT NULL
+        REFERENCES pharma_service.drugs(id),
+    available_quantity INT NOT NULL
+        CHECK (available_quantity >= 0),
+    last_updated TIMESTAMPTZ NOT NULL
+);
+
+
+-- 4) Creazione indici
+
+-- 4.1) prescription_service
+CREATE INDEX IF NOT EXISTS idx_ps_doctor
+    ON prescription_service.prescriptions(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_ps_patient
+    ON prescription_service.prescriptions(patient_id);
+CREATE INDEX IF NOT EXISTS idx_pi_drug
+    ON prescription_service.prescription_items(drug_id);
+CREATE INDEX IF NOT EXISTS idx_pi_active_ingredient
+    ON prescription_service.prescription_items(active_ingredient_id);
+
+-- 4.2) dispensation_service
+CREATE INDEX IF NOT EXISTS idx_ds_prescription
+    ON dispensation_service.dispensations(prescription_id);
+CREATE INDEX IF NOT EXISTS idx_ds_pharmacist
+    ON dispensation_service.dispensations(dispensed_by);
+
+-- 4.3) inventory_service
+CREATE INDEX IF NOT EXISTS idx_is_drug
+    ON inventory_service.inventory_items(drug_id);
+
+-- ====================================================
+-- FINE SCRIPT DDL UNIFICATO
+-- ====================================================
