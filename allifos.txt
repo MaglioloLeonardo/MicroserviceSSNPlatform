@@ -688,7 +688,6 @@ class DispensationServiceApplicationTests {
 
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- ereditiamo dal parent aggregator -->
     <parent>
         <groupId>tassproject.backend</groupId>
         <artifactId>backend</artifactId>
@@ -706,7 +705,7 @@ class DispensationServiceApplicationTests {
     </properties>
 
     <dependencies>
-        <!-- Core dependencies -->
+        <!-- Core -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -726,7 +725,19 @@ class DispensationServiceApplicationTests {
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Test dependencies -->
+        <!-- Flyway (🆕 per gestire la rimozione del vecchio FK) -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
+        <!-- Actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -737,12 +748,6 @@ class DispensationServiceApplicationTests {
             <artifactId>testcontainers</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>1.18.38</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
@@ -757,14 +762,16 @@ class DispensationServiceApplicationTests {
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.38</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
     <build>
         <plugins>
-            <!-- per generare le annotation prima della compilazione -->
+            <!-- Lombok annotation processing -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -777,20 +784,18 @@ class DispensationServiceApplicationTests {
                             <version>1.18.38</version>
                         </path>
                     </annotationProcessorPaths>
+                    <release>${java.version}</release>
                 </configuration>
             </plugin>
 
-            <!-- Spring Boot: rende il jar auto-avviabile -->
+            <!-- Spring Boot -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
                 <executions>
-                    <!-- aggiunge il MANIFEST con Main-Class -->
                     <execution>
-                        <goals>
-                            <goal>repackage</goal>
-                        </goals>
+                        <goals><goal>repackage</goal></goals>
                     </execution>
                 </executions>
             </plugin>
@@ -807,6 +812,32 @@ package tassproject.inventoryservice;
 import java.util.UUID;
 
 public record AvailabilityResponse(UUID drugId, int quantity) {}
+
+### File: inventory-service/src/main/java/tassproject/inventoryservice/GlobalExceptionHandler.java
+----------------------------------------
+package tassproject.inventoryservice;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+
+/**
+ * Trasforma le eccezioni di validazione in risposte HTTP leggibili.
+ */
+@ControllerAdvice
+class GlobalExceptionHandler {
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<ErrorDTO> handleBadRequest(IllegalArgumentException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorDTO(ex.getMessage()));
+    }
+
+    record ErrorDTO(String error) {}
+}
+
 
 ### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryApplicationService.java
 ----------------------------------------
@@ -827,30 +858,36 @@ public class InventoryApplicationService {
 
     private final InventoryItemRepository repo;
 
-    /* ──────────────────────── lettura ──────────────────────── */
+    /* ────────────── lettura ────────────── */
 
     @Transactional(readOnly = true)
     public AvailabilityResponse checkAvailability(UUID drugId) {
-        int qty = repo.findAll().stream()
-                .filter(i -> i.getDrugId().equals(drugId))
-                .mapToInt(InventoryItem::getAvailableQuantity)
-                .sum();
+        int qty = repo.findByDrugId(drugId)
+                .map(InventoryItem::getAvailableQuantity)
+                .orElse(0);
         return new AvailabilityResponse(drugId, qty);
     }
 
-    /* ──────────────────────── scrittura ─────────────────────── */
+    /* ───────────── scrittura ───────────── */
 
     public void reserve(UUID drugId, int quantity, String reason) {
-        var row = repo.findAll().stream()
-                .filter(i -> i.getDrugId().equals(drugId))
-                .findFirst()
-                .orElseGet(() -> new InventoryItem(
-                        UUID.randomUUID(), drugId, 0, OffsetDateTime.now()));
 
-        row.setAvailableQuantity(Math.max(0, row.getAvailableQuantity() - quantity));
+        // 1) La riga di magazzino DEVE esistere: se manca → 400
+        var row = repo.findByDrugId(drugId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Il farmaco %s non è presente a magazzino".formatted(drugId)));
+
+        // 2) Controllo stock sufficiente
+        if (row.getAvailableQuantity() < quantity) {
+            throw new IllegalArgumentException("Scorte insufficienti per la prenotazione");
+        }
+
+        // 3) Aggiornamento quantità
+        row.setAvailableQuantity(row.getAvailableQuantity() - quantity);
         row.setLastUpdated(OffsetDateTime.now());
         repo.save(row);
-        // (eventuale publish Rabbit o log, se necessario)
+
+        // (eventuale publish Rabbit / log, se serve)
     }
 }
 
@@ -957,15 +994,19 @@ public class InventoryItem {
 
 ### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryItemRepository.java
 ----------------------------------------
-// inventory-service/src/main/java/tassproject/inventoryservice/repository/InventoryItemRepository.java
 package tassproject.inventoryservice.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import tassproject.inventoryservice.InventoryItem;
 
+import java.util.Optional;
 import java.util.UUID;
 
-public interface InventoryItemRepository extends JpaRepository<InventoryItem, UUID> {}
+public interface InventoryItemRepository extends JpaRepository<InventoryItem, UUID> {
+
+    /* Cerca la riga di magazzino per drugId */
+    Optional<InventoryItem> findByDrugId(UUID drugId);
+}
 
 
 ### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryServiceApplication.java
@@ -1002,22 +1043,37 @@ public record ReserveInventoryRequest(
 spring.application.name=inventory-service
 server.port=${SERVER_PORT:8080}
 
+# ???????????????? DATASOURCE ????????????????
 spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
 spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
 spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
+# ???????????????? JPA / HIBERNATE ????????????????
 spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 spring.jpa.properties.hibernate.default_schema=inventory_service
 
+# ???????????????? FLYWAY ????????????????
+spring.flyway.schemas=inventory_service
+spring.flyway.baseline-on-migrate=true
+spring.flyway.baseline-version=0
+
+# ???????????????? ACTUATOR ????????????????
 management.endpoints.web.exposure.include=health,info
 
-# HikariCP (opzionale)
+# ???????????????? HIKARICP ????????????????
 spring.datasource.hikari.maximum-pool-size=10
 spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
+
+
+### File: inventory-service/src/main/resources/db/migration/V1__drop_inventory_items_drug_fk.sql
+----------------------------------------
+-- Rimuove il vecchio vincolo che puntava alla tabella inesistente "drugs"
+ALTER TABLE IF EXISTS inventory_service.inventory_items
+    DROP CONSTRAINT IF EXISTS inventory_items_drug_id_fkey;
 
 
 ### File: inventory-service/src/test/java/tassproject/inventoryservice/InventoryItemRepositoryIT.java
@@ -1495,6 +1551,14 @@ class NotificationServiceApplicationTests {
     <packaging>jar</packaging>
     <name>prescription-service</name>
 
+    <!-- 1️⃣ Proprietà generali -->
+    <properties>
+        <!-- forziamo UTF-8 su sorgenti, report e resources -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <java.version>17</java.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -1527,11 +1591,15 @@ class NotificationServiceApplicationTests {
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <!-- Test e Testcontainers -->
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Testcontainers -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
@@ -1551,16 +1619,41 @@ class NotificationServiceApplicationTests {
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
-        </dependency>
-
-
     </dependencies>
 
     <build>
+        <!-- Disabilitiamo il resource filtering -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+
         <plugins>
+            <!-- Impostiamo l’encoding su UTF-8 anche nel Resources Plugin -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+
+            <!-- Compiler Plugin (per sicurezza, Java 17) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                </configuration>
+            </plugin>
+
+            <!-- Spring Boot Maven Plugin -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -2145,27 +2238,7 @@ public record UpdatePrescriptionStatusRequest(@NotNull Prescription.Status newSt
 
 ### File: prescription-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=prescription-service
-server.port=${SERVER_PORT:8080}
-
-spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
-spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
-spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
-spring.datasource.driver-class-name=org.postgresql.Driver
-
-spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
-spring.jpa.properties.hibernate.default_schema=prescription_service
-
-management.endpoints.web.exposure.include=health,info
-
-# HikariCP (opzionale)
-spring.datasource.hikari.maximum-pool-size=10
-spring.datasource.hikari.minimum-idle=2
-spring.datasource.hikari.idle-timeout=300000
-spring.datasource.hikari.max-lifetime=600000
-
-spring.flyway.schemas=prescription_service
+<<ERROR reading file: 'utf-8' codec can't decode byte 0xe0 in position 393: invalid continuation byte>>
 
 
 ### File: prescription-service/src/main/resources/db/migration/V1__drop_foreign_keys.sql

@@ -1,0 +1,114 @@
+@hostname    = localhost
+@gatewayPort = 8080
+# fissi per i test
+@doctorId    = 10000000-0000-0000-0000-000000000001
+@patientId   = 20000000-0000-0000-0000-000000000001
+@drugId      = 52000000-0000-0000-0000-000000000005
+@aiId        = 51000000-0000-0000-0000-000000000005
+@dispBy      = 30000000-0000-0000-0000-000000000001
+
+### ─────────────────────────── Gateway Health ───────────────────────────
+GET http://{{hostname}}:{{gatewayPort}}/actuator/health
+Accept: application/json
+
+###
+
+### ───────────────────────── Create Prescription ────────────────────────
+POST http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions
+Content-Type: application/json
+
+{
+  "doctorId":        "{{doctorId}}",
+  "patientId":       "{{patientId}}",
+  "therapyDuration": "7 giorni",
+  "exemption":       false,
+  "items": [
+    {
+      "drugId":             "{{drugId}}",
+      "activeIngredientId": "{{aiId}}",
+      "activeIngredient":   "Paracetamolo",
+      "dosage":             "500mg",
+      "quantity":           2
+    }
+  ]
+}
+> {%
+    if (response.status === 201) {
+        client.global.set("prescId", response.body.id);
+        console.log("📌  prescId salvato:", response.body.id);
+    }
+%}
+
+###
+
+### ─────────────────────── Retrieve Prescription ───────────────────────
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions/{{prescId}}
+Accept: application/json
+
+###
+
+### ─────────────────────── Update Prescription ────────────────────────
+PUT http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions/{{prescId}}/status
+Content-Type: application/json
+
+{
+  "newStatus": "DISPENSED"
+}
+
+###
+
+### ──────────────── List Active Prescriptions by Patient ───────────────
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/patients/{{patientId}}/prescriptions/active
+Accept: application/json
+
+###
+
+### ────────────────────── List Dispensations ──────────────────────────
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions/{{prescId}}/dispensations
+Accept: application/json
+
+###
+
+### ─────────────────── Create Dispensation ────────────────────────────
+POST http://{{hostname}}:{{gatewayPort}}/api/v1/dispensations
+Content-Type: application/json
+
+{
+  "prescriptionId": "{{prescId}}",
+  "dispensedBy":    "{{dispBy}}"
+}
+> {%
+    if (response.status === 201) {
+        client.global.set("dispId", response.body.id);
+        console.log("📌  dispId salvato:", response.body.id);
+    }
+%}
+
+###
+
+### ─────────────────── Inventory Availability ─────────────────────────
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/inventory/{{drugId}}/availability
+Accept: application/json
+
+###
+
+### ─────────────────── Reserve Inventory ─────────────────────────────
+POST http://{{hostname}}:{{gatewayPort}}/api/v1/inventory/items/{{drugId}}/reserve
+Content-Type: application/json
+
+{
+  "quantity": 5,
+  "reason":   "Test reservation"
+}
+
+###
+
+### ─────────────────── Send Notification ─────────────────────────────
+POST http://{{hostname}}:{{gatewayPort}}/api/v1/notifications
+Content-Type: application/json
+
+{
+  "recipientId": "{{patientId}}",
+  "message":     "Gateway test notification",
+  "type":        "INFO"
+}

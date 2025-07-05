@@ -1,0 +1,49 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      # 1) filtro CORS elementare (per demo/local dev):
+      globalcors:
+        corsConfigurations:
+          "[/**]":
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+
+      # 2) rotte verso i micro-servizi
+      routes:
+
+        # ────────────────── Prescription-Service ──────────────────
+        - id: prescription-service
+          uri: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
+          predicates:
+            # Attenzione: non si può più mettere ** in mezzo ad un path,
+            # perciò usiamo {patientId} come placeholder di un singolo segmento.
+            - Path=/api/v1/prescriptions/**,/api/v1/patients/{patientId}/prescriptions/**
+
+        # ────────────────── Dispensation-Service ──────────────────
+        - id: dispensation-service
+          uri: ${DISPENSATION_SERVICE_URL:http://dispensation-service:8080}
+          predicates:
+            - Path=/api/v1/dispensations/**,/api/v1/prescriptions/*/dispensations/**
+
+        # ────────────────── Inventory-Service ─────────────────────
+        - id: inventory-service
+          uri: ${INVENTORY_SERVICE_URL:http://inventory-service:8080}
+          predicates:
+            - Path=/api/v1/inventory/**
+
+        # ────────────────── Notification-Service ──────────────────
+        - id: notification-service
+          uri: ${NOTIFICATION_SERVICE_URL:http://notification-service:8080}
+          predicates:
+            - Path=/api/v1/notifications/**
+
+      # 3) header duplicati (utile con CORS):
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin
