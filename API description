@@ -1,0 +1,460 @@
+Ecco un esempio di file .http (per l’HTTP Client di VSCode) che testa solo l’API-Gateway sulla porta 8080 e verifica il corretto instradamento verso i microservizi:
+
+http
+Copia
+Modifica
+@hostname    = localhost
+@gatewayPort = 8080
+# fissi per i test
+@doctorId    = 10000000-0000-0000-0000-000000000001
+@patientId   = 20000000-0000-0000-0000-000000000001
+@drugId      = 52000000-0000-0000-0000-000000000005
+@aiId        = 51000000-0000-0000-0000-000000000005
+@dispBy      = 30000000-0000-0000-0000-000000000001
+
+### ─────────────────────────── Gateway Health ───────────────────────────
+GET http://{{hostname}}:{{gatewayPort}}/actuator/health
+Accept: application/json
+
+###
+
+### ───────────────────────── Create Prescription ────────────────────────
+POST http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions
+Content-Type: application/json
+
+{
+  "doctorId":        "{{doctorId}}",
+  "patientId":       "{{patientId}}",
+  "therapyDuration": "7 giorni",
+  "exemption":       false,
+  "items": [
+    {
+      "drugId":             "{{drugId}}",
+      "activeIngredientId": "{{aiId}}",
+      "activeIngredient":   "Paracetamolo",
+      "dosage":             "500mg",
+      "quantity":           2
+    }
+  ]
+}
+> {%
+    if (response.status === 201) {
+        client.global.set("prescId", response.body.id);
+        console.log("📌  prescId salvato:", response.body.id);
+    }
+%}
+
+###
+
+### ─────────────────────── Retrieve Prescription ───────────────────────
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions/{{prescId}}
+Accept: application/json
+
+###
+
+### ─────────────────────── Update Prescription ────────────────────────
+PUT http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions/{{prescId}}/status
+Content-Type: application/json
+
+{
+  "newStatus": "DISPENSED"
+}
+
+###
+
+### ──────────────── List Active Prescriptions by Patient ───────────────
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/patients/{{patientId}}/prescriptions/active
+Accept: application/json
+
+###
+
+### ────────────────────── List Dispensations ──────────────────────────
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions/{{prescId}}/dispensations
+Accept: application/json
+
+###
+
+### ─────────────────── Create Dispensation ────────────────────────────
+POST http://{{hostname}}:{{gatewayPort}}/api/v1/dispensations
+Content-Type: application/json
+
+{
+  "prescriptionId": "{{prescId}}",
+  "dispensedBy":    "{{dispBy}}"
+}
+> {%
+    if (response.status === 201) {
+        client.global.set("dispId", response.body.id);
+        console.log("📌  dispId salvato:", response.body.id);
+    }
+%}
+
+###
+
+### ─────────────────── Inventory Availability ─────────────────────────
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/inventory/{{drugId}}/availability
+Accept: application/json
+
+###
+
+### ─────────────────── Reserve Inventory ─────────────────────────────
+POST http://{{hostname}}:{{gatewayPort}}/api/v1/inventory/items/{{drugId}}/reserve
+Content-Type: application/json
+
+{
+  "quantity": 5,
+  "reason":   "Test reservation"
+}
+
+###
+
+### ─────────────────── Send Notification ─────────────────────────────
+POST http://{{hostname}}:{{gatewayPort}}/api/v1/notifications
+Content-Type: application/json
+
+{
+  "recipientId": "{{patientId}}",
+  "message":     "Gateway test notification",
+  "type":        "INFO"
+}
+Salva questo file ad es. come api-gateway-tests.http e aprilo in VSCode: con il plugin “REST Client” potrai eseguire ogni sezione cliccando sul link “Send Request” che comparirà sopra ciascun blocco.
+
+
+
+
+
+
+
+
+Hai detto:
+Come mai se non runno generate request prima alcuni test non vanno ma dopo che li ho runnati poi vanno? qualcosa non va
+
+
+ChatGPT ha detto:
+
+Ragionato per 8 secondi
+Non è un bug del Gateway né dei servizi, ma semplicemente il modo in cui il “REST Client” di VSCode (o qualunque altro client con script inline) gestisce le variabili che derivano da una response.
+
+Perché succede
+Il POST “Create Prescription” è quello che imposta
+
+js
+Copia
+Modifica
+client.global.set("prescId", response.body.id);
+quindi fino a quando non esegui quella request non esiste in memoria alcuna variabile prescId.
+
+Tutte le request successive usano {{prescId}} nella URL, perciò se non l’hai ancora creato:
+
+{{prescId}} è vuoto/undefined
+
+il path non viene interpolato correttamente (tipicamente diventa /api/v1/prescriptions//…)
+
+il Gateway riceve un URL non valido → 404 o 400.
+
+Subito dopo che quella variabile è “registrata” in memoria, tutte le request che la usano tornano a girare perfettamente, perché {{prescId}} ora esiste.
+
+Come evitarlo
+Hai due strade:
+
+Lanciare sempre in ordine
+Prima il blocco di creazione (POST /prescriptions) → poi tutti gli altri.
+È il più semplice, ma richiede di ricordarsi di non saltare il primo step.
+
+Definire un environment per il REST-Client (consigliato)
+Crea un file http-client.env.json nella radice del tuo progetto con i valori fissi, ad es.:
+
+jsonc
+Copia
+Modifica
+{
+  "test": {
+    "hostname": "localhost",
+    "gatewayPort": "8080",
+    "doctorId": "10000000-0000-0000-0000-000000000001",
+    "patientId": "20000000-0000-0000-0000-000000000001",
+    "drugId": "52000000-0000-0000-0000-000000000005",
+    "aiId":   "51000000-0000-0000-0000-000000000005",
+    "dispBy": "30000000-0000-0000-0000-000000000001"
+  }
+}
+Poi nel tuo .http:
+
+http
+Copia
+Modifica
+@ env = test
+
+@hostname    = {{hostname}}
+@gatewayPort = {{gatewayPort}}
+@doctorId    = {{doctorId}}
+@patientId   = {{patientId}}
+@drugId      = {{drugId}}
+@aiId        = {{aiId}}
+@dispBy      = {{dispBy}}
+@prescId     = ""
+@dispId      = ""
+In questo modo hai già tutti i valori “statici” caricati e inizializzati.
+La variabile @prescId resta vuota finché non la popoli col POST, ma almeno hostname/porte/UUID fissi sono sempre pronti.
+
+Riepilogo
+Dipendenza: qualunque call che usi {{prescId}} dipende da un run precedente che l’abbia settata via script.
+
+Soluzione rapida: esegui sempre prima il blocco di “Create Prescription”.
+
+Soluzione strutturata: usa un file di environment (http-client.env.json) per pre-caricare i valori fissi, lasciando vuote solo le variabili che verranno riempite dinamicamente.
+
+
+
+
+
+
+
+
+Hai detto:
+Descrivi le API dettagliatamente così che possa passarlo a un LLM atto a usarle per fare il frontend
+
+
+ChatGPT ha detto:
+
+Ragionato per 8 secondi
+Ecco la descrizione completa di tutte le API esposte dall’API-Gateway (default http://localhost:8080) così da poterla fornire a un LLM o usarla direttamente per costruire il frontend.
+
+Base URL
+css
+Copia
+Modifica
+http://{hostname}:{gatewayPort}
+Default
+
+yaml
+Copia
+Modifica
+hostname: localhost
+gatewayPort: 8080
+Health & Actuator
+Metodo	Path	Descrizione	Response
+GET	/actuator/health	Stato dell’applicazione	200 OK
+json { "status": "UP" }
+GET	/actuator/info	Informazioni custom (se presenti)	200 OK
+application-specific
+
+Prescription Service
+1. Crea nuova prescrizione
+bash
+Copia
+Modifica
+POST /api/v1/prescriptions
+Request Body (JSON):
+
+Campo	Tipo	Vincolo	Descrizione
+doctorId	UUID	required	ID del medico
+patientId	UUID	required	ID del paziente
+therapyDuration	String	optional	Durata terapia (es. “7 giorni”)
+exemption	Boolean	required	Esenzione ticket
+items	Array	length ≥ 1	Lista di PrescriptionItemDto
+
+PrescriptionItemDto:
+
+Campo	Tipo	Vincolo	Descrizione
+drugId	UUID	required	ID del farmaco
+activeIngredientId	UUID	required	ID principio attivo
+activeIngredient	String	required, non-blank	Nome principio attivo
+dosage	String	required, non-blank	Dosaggio (es. “500mg”)
+quantity	Integer	≥ 1	Quantità ricetta
+
+Response:
+
+201 Created
+
+Body: PrescriptionResponse
+
+json
+Copia
+Modifica
+{
+  "id":               "UUID",
+  "doctorId":         "UUID",
+  "patientId":        "UUID",
+  "issuedAt":         "2025-07-05T12:34:56.789Z",
+  "status":           "OPEN",
+  "exemption":        false,
+  "therapyDuration":  "7 giorni",
+  "items": [
+    {
+      "drugId":             "UUID",
+      "activeIngredientId": "UUID",
+      "activeIngredient":   "Paracetamolo",
+      "dosage":             "500mg",
+      "quantity":           2
+    }
+  ]
+}
+2. Recupera prescrizione per ID
+bash
+Copia
+Modifica
+GET /api/v1/prescriptions/{id}
+Path Parameter:
+id (UUID) — identificativo della prescrizione
+
+Response:
+
+200 OK
+
+Body: PrescriptionResponse (come sopra)
+
+3. Aggiorna stato prescrizione
+bash
+Copia
+Modifica
+PUT /api/v1/prescriptions/{id}/status
+Path Parameter:
+id (UUID)
+
+Request Body:
+
+Campo	Tipo	Valori ammessi
+newStatus	String	DISPENSED, COMPLETED, CANCELLED
+
+Response:
+
+200 OK
+
+Body: PrescriptionResponse (stato aggiornato)
+
+4. Lista prescrizioni attive di un paziente
+bash
+Copia
+Modifica
+GET /api/v1/patients/{patientId}/prescriptions/active
+Path Parameter:
+patientId (UUID)
+
+Response:
+
+200 OK
+
+Body: Array di PrescriptionResponse
+(solo status OPEN o DISPENSED)
+
+Dispensation Service
+5. Elenco dispensazioni di una prescrizione
+bash
+Copia
+Modifica
+GET /api/v1/prescriptions/{prescriptionId}/dispensations
+Path Parameter:
+prescriptionId (UUID)
+
+Response:
+
+200 OK
+
+Body: Array di DispensationResponse
+
+json
+Copia
+Modifica
+{
+  "id":             "UUID",
+  "prescriptionId": "UUID",
+  "dispensedAt":    "2025-07-05T12:35:10.123Z",
+  "dispensedBy":    "UUID",
+  "status":         "DONE"
+}
+6. Crea nuova dispensazione
+bash
+Copia
+Modifica
+POST /api/v1/dispensations
+Request Body:
+
+Campo	Tipo	Descrizione
+prescriptionId	UUID	ID della prescrizione
+dispensedBy	UUID	Chi ha effettuato la dispensazione
+
+Response:
+
+201 Created
+
+Body: DispensationResponse (come sopra)
+
+Inventory Service
+7. Controlla disponibilità farmaco
+bash
+Copia
+Modifica
+GET /api/v1/inventory/{drugId}/availability
+Path Parameter:
+drugId (UUID)
+
+Response:
+
+200 OK
+
+Body: AvailabilityResponse
+
+json
+Copia
+Modifica
+{
+  "drugId":  "UUID",
+  "quantity": 10
+}
+8. Riserva quantità in magazzino
+bash
+Copia
+Modifica
+POST /api/v1/inventory/items/{drugId}/reserve
+Path Parameter:
+drugId (UUID)
+
+Request Body:
+
+Campo	Tipo	Vincolo	Descrizione
+quantity	Integer	≥ 1	Quantità da riservare
+reason	String	non-blank	Motivazione
+
+Response:
+
+204 No Content
+
+Body vuoto
+
+Errori 400 Bad Request:
+
+Farmaco mancante:
+
+json
+Copia
+Modifica
+{ "error": "Il farmaco <drugId> non è presente a magazzino" }
+Scorte insufficienti:
+
+json
+Copia
+Modifica
+{ "error": "Scorte insufficienti per la prenotazione" }
+Notification Service
+9. Invia notifica
+bash
+Copia
+Modifica
+POST /api/v1/notifications
+Request Body:
+
+Campo	Tipo	Descrizione
+recipientId	UUID	ID del destinatario
+message	String	Testo della notifica
+type	String	INFO, WARNING, ERROR
+
+Response:
+
+202 Accepted
+
+Body vuoto
+
+Nota: tutti gli endpoint sono esposti attraverso l’API Gateway e si comportano come se fossero servizi monolitici: il frontend chiamerà sempre http://localhost:8080/....
+
+Con queste specifiche un LLM (o qualsiasi tool di code generation) potrà generare il codice UI chiamando questi endpoint, serializzando e deserializzando i JSON secondo gli schemi indicati.
