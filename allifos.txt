@@ -73,6 +73,57 @@ public class ApiGatewayApplication {
 }
 
 
+### File: api-gateway/src/main/java/tassproject/apigateway/JwtCookieAuthWebFilter.java
+----------------------------------------
+package tassproject.apigateway;
+
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
+import reactor.core.publisher.Mono;
+
+/**
+ * Questo filtro intercetta la richiesta:
+ * - Se manca l'header Authorization ma esiste il cookie access_token, aggiunge l'header.
+ */
+@Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
+public class JwtCookieAuthWebFilter implements WebFilter {
+
+    private static final String COOKIE_NAME = "access_token";
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+
+        // Se già presente Authorization, passa avanti
+        if (authHeader != null && !authHeader.isBlank()) {
+            return chain.filter(exchange);
+        }
+
+        // Altrimenti cerca il cookie
+        return Mono.defer(() -> {
+            var cookie = exchange.getRequest().getCookies().getFirst(COOKIE_NAME);
+            if (cookie != null && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+                // Crea una nuova request con l'header Authorization: Bearer <cookie_value>
+                ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + cookie.getValue())
+                        .build();
+                ServerWebExchange mutatedExchange = exchange.mutate().request(mutatedRequest).build();
+                return chain.filter(mutatedExchange);
+            }
+            // Nessun JWT in header o cookie → passa avanti senza mutare nulla (scatta la security dopo)
+            return chain.filter(exchange);
+        });
+    }
+}
+
+
 ### File: api-gateway/src/main/java/tassproject/apigateway/SecurityConfig.java
 ----------------------------------------
 package tassproject.apigateway;
@@ -85,6 +136,7 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -98,12 +150,20 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeExchange(exchanges -> exchanges
+
+                        // 1) Permetti il login Google e il callback OAuth2
+                        .pathMatchers("/oauth2/authorization/google", "/login/oauth2/**").permitAll()
+
+                        // 2) Permetti l’accesso alle API REST non protette
                         .pathMatchers("/api/v1/auth/**", "/actuator/**").permitAll()
+
+                        // 3) Tutte le altre rotte richiedono un JWT valido
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt()
                 );
+
         return http.build();
     }
 
@@ -147,48 +207,53 @@ spring:
 
   cloud:
     gateway:
-      # 1) filtro CORS elementare (per demo/local dev):
       globalcors:
         corsConfigurations:
           "[/**]":
-            allowedOrigins: "*"
+            allowedOrigins: "http://localhost:3000"  # non "*"
             allowedMethods: "*"
             allowedHeaders: "*"
+            allowCredentials: true
 
-      # 2) rotte verso i micro-servizi
       routes:
 
-        # ────────────────── Auth-Service ──────────────────
+        # OAuth2 Login (Google) → auth-service su container auth-service:8080
+        - id: oauth2-login
+          uri: http://auth-service:8080
+          predicates:
+            - Path=/oauth2/authorization/google
+            - Path=/login/oauth2/**
+
+        # Auth-service (REST) → stesso servizio
         - id: auth-service
-          uri: ${AUTH_SERVICE_URL:http://auth-service:8080}
+          uri: http://auth-service:8080
           predicates:
             - Path=/api/v1/auth/**
 
-        # ────────────────── Prescription-Service ──────────────────
+        # Prescription
         - id: prescription-service
           uri: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
           predicates:
             - Path=/api/v1/prescriptions/**,/api/v1/patients/{patientId}/prescriptions/**
 
-        # ────────────────── Dispensation-Service ──────────────────
+        # Dispensation
         - id: dispensation-service
           uri: ${DISPENSATION_SERVICE_URL:http://dispensation-service:8080}
           predicates:
             - Path=/api/v1/dispensations/**,/api/v1/prescriptions/*/dispensations/**
 
-        # ────────────────── Inventory-Service ─────────────────────
+        # Inventory
         - id: inventory-service
           uri: ${INVENTORY_SERVICE_URL:http://inventory-service:8080}
           predicates:
             - Path=/api/v1/inventory/**
 
-        # ────────────────── Notification-Service ──────────────────
+        # Notification
         - id: notification-service
           uri: ${NOTIFICATION_SERVICE_URL:http://notification-service:8080}
           predicates:
             - Path=/api/v1/notifications/**
 
-      # 3) header duplicati (utile con CORS):
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
 
@@ -568,6 +633,130 @@ public record LoginRequest(
         @NotBlank String password) {}
 
 
+### File: auth-service/src/main/java/tassproject/authservice/OAuth2LoginSuccessHandler.java
+----------------------------------------
+package tassproject.authservice;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.stereotype.Component;
+import tassproject.authservice.repository.UserRepository;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Map;
+
+@Component
+@RequiredArgsConstructor
+public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
+
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
+
+    @Override
+    public void onAuthenticationSuccess(HttpServletRequest request,
+                                        HttpServletResponse response,
+                                        Authentication authentication)
+            throws IOException, ServletException {
+        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
+
+        String email = oAuth2User.getAttribute("email");
+        if (email == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            new ObjectMapper().writeValue(response.getWriter(),
+                    Map.of("error","Unauthorized","message","No email provided by Google"));
+            return;
+        }
+
+        // trova o crea un User locale
+        User user = userRepository.findByUsername(email.toLowerCase())
+                .orElseGet(() -> {
+                    User u = new User(
+                            email.toLowerCase(),
+                            "",                  // password vuota (non useremo il form-login)
+                            Role.PATIENT         // default role
+                    );
+                    return userRepository.save(u);
+                });
+
+        // genera il JWT
+        String jwt = jwtUtil.generateToken(user);
+
+        // 🚩 Imposta il JWT in un cookie HttpOnly (opzionale, ma consigliato)
+        Cookie jwtCookie = new Cookie("access_token", jwt);
+        jwtCookie.setHttpOnly(true);
+        jwtCookie.setSecure(request.isSecure());
+        jwtCookie.setPath("/");
+        jwtCookie.setMaxAge(60 * 60); // 1 ora, oppure configurable
+
+        response.addCookie(jwtCookie);
+
+        // rispondi JSON (se vuoi che il frontend legga il token e lo gestisca)
+        response.setContentType("application/json");
+        new ObjectMapper().writeValue(response.getWriter(),
+                Map.of(
+                        "tokenType","Bearer",
+                        "accessToken", jwt
+                )
+        );
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/OAuth2SecurityConfig.java
+----------------------------------------
+package tassproject.authservice;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@RequiredArgsConstructor
+public class OAuth2SecurityConfig {
+
+    private final OAuth2LoginSuccessHandler successHandler;
+    private final RestAuthenticationEntryPoint restEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
+
+    @Bean
+    @Order(1)
+    public SecurityFilterChain oauth2LoginFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher(
+                        "/oauth2/authorization/google",
+                        "/login/oauth2/**",
+                        "/api/v1/auth/**",
+                        "/actuator/**"
+                )
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll()
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(restEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler)
+                )
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(successHandler)
+                );
+        return http.build();
+    }
+}
+
+
 ### File: auth-service/src/main/java/tassproject/authservice/RegisterRequest.java
 ----------------------------------------
 package tassproject.authservice;
@@ -581,6 +770,44 @@ public record RegisterRequest(
         @NotBlank @Email String email,
         @NotBlank String password,
         @NotNull Role role) {}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/ResourceServerConfig.java
+----------------------------------------
+package tassproject.authservice;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class ResourceServerConfig {
+
+    private final JwtDecoder jwtDecoder;
+
+    @Bean
+    @Order(2)
+    public SecurityFilterChain resourceServerFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().authenticated()
+                )
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.decoder(jwtDecoder))
+                );
+        return http.build();
+    }
+}
 
 
 ### File: auth-service/src/main/java/tassproject/authservice/RestAccessDeniedHandler.java
@@ -695,7 +922,6 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.AuthenticationEntryPoint;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import tassproject.authservice.repository.UserRepository;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -709,6 +935,7 @@ public class SecurityConfig {
     private final UserRepository users;
     private final RestAuthenticationEntryPoint restEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;  // <— iniettato
 
     // -------- UserDetailsService --------
     @Bean
@@ -756,19 +983,21 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // permettiamo TUTTI i metodi su /api/v1/auth/** e actuator
                         .requestMatchers("/api/v1/auth/**", "/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                // gestori personalizzati per 401 e 403 -> restituiscono JSON
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restEntryPoint)
                         .accessDeniedHandler(restAccessDeniedHandler)
                 )
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationManager(authenticationManager(userDetailsService()))
-                .oauth2Login(Customizer.withDefaults())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oAuth2LoginSuccessHandler)      // <— qui
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(Customizer.withDefaults())
+                );
 
         return http.build();
     }
@@ -875,8 +1104,8 @@ jwt.secret=${JWT_SECRET:U8mG8YkqzUjH9iMz4HfA3V6pEJxQ1r4z7NnYtX9aQ2M=}
 jwt.expiration=${JWT_EXPIRATION_MS:3600000}
 
 # === OAuth2 Google Registration ===
-spring.security.oauth2.client.registration.google.client-id=${GOOGLE_CLIENT_ID:__fill__}
-spring.security.oauth2.client.registration.google.client-secret=${GOOGLE_CLIENT_SECRET:__fill__}
+spring.security.oauth2.client.registration.google.client-id=1052773766792-14leidinpkl862i67o4k62ck8iqtqjrn.apps.googleusercontent.com
+spring.security.oauth2.client.registration.google.client-secret=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
 spring.security.oauth2.client.registration.google.redirect-uri={baseUrl}/login/oauth2/code/{registrationId}
 spring.security.oauth2.client.registration.google.scope=openid,profile,email
 
@@ -887,6 +1116,19 @@ spring.security.oauth2.client.provider.google.user-info-uri=https://www.googleap
 spring.security.oauth2.client.provider.google.user-name-attribute=sub
 
 management.endpoints.web.exposure.include=health,info
+
+
+### File: auth-service/src/main/resources/application.yml
+----------------------------------------
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          "[/**]":
+            allowedOrigins: "http://localhost:3000"
+            allowedMethods: "*"
+            allowedHeaders: "*"
 
 
 ### File: auth-service/src/test/java/tassproject/authservice/AuthServiceApplicationTests.java

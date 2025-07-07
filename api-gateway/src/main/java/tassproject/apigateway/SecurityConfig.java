@@ -8,6 +8,7 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -19,14 +20,19 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
-                .csrf(csrf -> csrf.disable())
-                .authorizeExchange(exchanges -> exchanges
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .authorizeExchange(ex -> ex
+                        // 1️⃣  tutta la trafila OAuth2 deve essere libera
+                        .pathMatchers("/oauth2/**", "/login/**").permitAll()
+
+                        // 2️⃣  API pubbliche non protette
                         .pathMatchers("/api/v1/auth/**", "/actuator/**").permitAll()
+
+                        // 3️⃣  qualsiasi altra rotta → JWT obbligatorio
                         .anyExchange().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt()
-                );
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt());
+
         return http.build();
     }
 

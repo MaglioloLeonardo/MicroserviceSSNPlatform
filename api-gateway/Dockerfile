@@ -53,5 +53,6 @@ HEALTHCHECK --interval=30s --timeout=2s \
 
 # JVM options
 ENV JAVA_OPTS=""
+ENV JWT_SECRET=""
 
 ENTRYPOINT ["sh","-c","java $JAVA_OPTS -Dspring.cloud.compatibility-verifier.enabled=false -jar app.jar"]

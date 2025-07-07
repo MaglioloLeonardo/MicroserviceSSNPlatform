@@ -7,47 +7,62 @@ spring:
 
   cloud:
     gateway:
-      # 1) filtro CORS elementare (per demo/local dev):
       globalcors:
         corsConfigurations:
           "[/**]":
-            allowedOrigins: "*"
+            allowedOrigins: "http://localhost:3000"
             allowedMethods: "*"
             allowedHeaders: "*"
+            allowCredentials: true
 
-      # 2) rotte verso i micro-servizi
       routes:
 
-        # ────────────────── Auth-Service ──────────────────
+        # ─────────────  OAUTH2 GOOGLE  ─────────────
+        # (1) richiesta iniziale /oauth2/authorization/google
+        - id: oauth2-authorization
+          uri: http://auth-service:8080      # dentro la rete Docker
+          predicates:
+            - Path=/oauth2/authorization/google
+          filters:
+            - PreserveHostHeader             # host esterno rimane “localhost:8080”
+
+        # (2) callback /login/oauth2/**
+        - id: oauth2-callback
+          uri: http://auth-service:8080
+          predicates:
+            - Path=/login/oauth2/**
+          filters:
+            - PreserveHostHeader
+
+        # ─────────────  AUTH REST  ─────────────
         - id: auth-service
-          uri: ${AUTH_SERVICE_URL:http://auth-service:8080}
+          uri: http://auth-service:8080
           predicates:
             - Path=/api/v1/auth/**
 
-        # ────────────────── Prescription-Service ──────────────────
+        # ─────────────  PRESCRIPTION  ─────────────
         - id: prescription-service
           uri: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
           predicates:
             - Path=/api/v1/prescriptions/**,/api/v1/patients/{patientId}/prescriptions/**
 
-        # ────────────────── Dispensation-Service ──────────────────
+        # ─────────────  DISPENSATION  ─────────────
         - id: dispensation-service
           uri: ${DISPENSATION_SERVICE_URL:http://dispensation-service:8080}
           predicates:
             - Path=/api/v1/dispensations/**,/api/v1/prescriptions/*/dispensations/**
 
-        # ────────────────── Inventory-Service ─────────────────────
+        # ─────────────  INVENTORY  ─────────────
         - id: inventory-service
           uri: ${INVENTORY_SERVICE_URL:http://inventory-service:8080}
           predicates:
             - Path=/api/v1/inventory/**
 
-        # ────────────────── Notification-Service ──────────────────
+        # ─────────────  NOTIFICATION  ─────────────
         - id: notification-service
           uri: ${NOTIFICATION_SERVICE_URL:http://notification-service:8080}
           predicates:
             - Path=/api/v1/notifications/**
 
-      # 3) header duplicati (utile con CORS):
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin

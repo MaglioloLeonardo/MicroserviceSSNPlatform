@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import tassproject.authservice.repository.UserRepository;
 
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -51,7 +52,16 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         // genera il JWT
         String jwt = jwtUtil.generateToken(user);
 
-        // rispondi JSON
+        // 🚩 Imposta il JWT in un cookie HttpOnly (opzionale, ma consigliato)
+        Cookie jwtCookie = new Cookie("access_token", jwt);
+        jwtCookie.setHttpOnly(true);
+        jwtCookie.setSecure(request.isSecure());
+        jwtCookie.setPath("/");
+        jwtCookie.setMaxAge(60 * 60); // 1 ora, oppure configurable
+
+        response.addCookie(jwtCookie);
+
+        // rispondi JSON (se vuoi che il frontend legga il token e lo gestisca)
         response.setContentType("application/json");
         new ObjectMapper().writeValue(response.getWriter(),
                 Map.of(
