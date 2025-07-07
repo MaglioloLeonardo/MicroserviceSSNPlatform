@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 REM Elenco dei servizi e relativo tag immagine
-set SERVICES=api-gateway dispensation-service inventory-service notification-service prescription-service
+set SERVICES=auth-service api-gateway dispensation-service inventory-service notification-service prescription-service
 
 for %%S in (%SERVICES%) do (
     echo ==============================================

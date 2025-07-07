@@ -131,6 +131,8 @@
         <module>dispensation-service</module>
         <module>inventory-service</module>
         <module>notification-service</module>
+        <module>auth-service</module>
     </modules>
+
 
 </project>

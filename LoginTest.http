@@ -1,0 +1,148 @@
+@host = http://localhost:8080
+@contentType = application/json
+@token =
+
+#############################################################################
+# 1) REGISTRAZIONE (via gateway) → 201 + cattura token
+#############################################################################
+
+### Registrazione utente valido
+POST {{host}}/api/v1/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "user1@example.com",
+  "password": "StrongPass123!",
+  "role": "PATIENT"
+}
+
+> {%
+    // qui uso response.body, non responseBody
+    const body = JSON.parse(response.body);
+    client.global.set("token", body.accessToken);
+%}
+
+> HTTP/1.1 201
+> Content-Type: application/json
+
+#############################################################################
+# 2) REGISTRAZIONE DUPLICATA → 400
+#############################################################################
+
+### Stessa email → 400
+POST {{host}}/api/v1/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "user1@example.com",
+  "password": "StrongPass123!",
+  "role": "PATIENT"
+}
+
+> HTTP/1.1 400
+> Content-Type: application/json
+> {
+>   "error": "Username già in uso"
+> }
+
+#############################################################################
+# 3) LOGIN (via gateway) → 200 + rinnova token
+#############################################################################
+
+### Login corretto
+POST {{host}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "user1@example.com",
+  "password": "StrongPass123!"
+}
+
+> {%
+    const body = JSON.parse(response.body);
+    client.global.set("token", body.accessToken);
+%}
+
+> HTTP/1.1 200
+> Content-Type: application/json
+
+#############################################################################
+# 4) LOGIN SBAGLIATO → 400
+#############################################################################
+
+### Password errata
+POST {{host}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "user1@example.com",
+  "password": "WrongPass!"
+}
+
+> HTTP/1.1 400
+> Content-Type: application/json
+> {
+>   "error": "Credenziali non valide"
+> }
+
+### Email inesistente
+POST {{host}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "noone@nowhere.com",
+  "password": "DoesntMatter1!"
+}
+
+> HTTP/1.1 400
+> Content-Type: application/json
+> {
+>   "error": "Credenziali non valide"
+> }
+
+#############################################################################
+# 5) VALIDAZIONE INPUT → 400
+#############################################################################
+
+### Email vuota
+POST {{host}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "",
+  "password": "x"
+}
+
+> HTTP/1.1 400
+
+### Email non valida
+POST {{host}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "not-an-email",
+  "password": "whatever"
+}
+
+> HTTP/1.1 400
+
+### Password vuota
+POST {{host}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "user1@example.com",
+  "password": ""
+}
+
+> HTTP/1.1 400
+
+#############################################################################
+# 6) USO DEL TOKEN SU UN ENDPOINT PROTETTO (esempio)
+#############################################################################
+
+### Chiamata a un endpoint che richiede auth (qui /patients)
+GET {{host}}/api/v1/patients/00000000-0000-0000-0000-000000000000/prescriptions/active
+Authorization: Bearer {{token}}
+
+> HTTP/1.1 200

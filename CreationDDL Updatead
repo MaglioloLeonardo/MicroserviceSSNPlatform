@@ -2,6 +2,30 @@
 -- DDL UNIFICATO: schemi e tabelle per tutti i servizi
 -- ====================================================
 
+-- 1) Creazione dello schema per isolare le tabelle di auth-service
+CREATE SCHEMA IF NOT EXISTS auth_service;
+
+-- 2) Creazione della tabella users
+CREATE TABLE auth_service.users (
+                                    id BIGSERIAL PRIMARY KEY,
+                                    username VARCHAR(255) NOT NULL UNIQUE,
+                                    password VARCHAR(255) NOT NULL,
+                                    role VARCHAR(50) NOT NULL,
+                                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 3) Index aggiuntivo su username (anche se UNIQUE già crea un index, lo specifichiamo per chiarezza)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username
+    ON auth_service.users(username);
+
+-- 4) Grant dei privilegi di default per l’utente del servizio
+GRANT USAGE ON SCHEMA auth_service TO myuser;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA auth_service TO myuser;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth_service
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO myuser;
+
+
+
 -- 1) Pulizia eventuali tabelle residue in public
 DROP TABLE IF EXISTS
     public.prescription_items,

@@ -17,6 +17,7 @@ COPY dispensation-service/   dispensation-service/
 COPY inventory-service/      inventory-service/
 COPY notification-service/   notification-service/
 COPY prescription-service/   prescription-service/
+COPY auth-service/           auth-service/
 
 # 3️⃣ “Fake” go-offline per scaldare la cache dei dependency layer
 RUN ./mvnw -B -ntp dependency:go-offline

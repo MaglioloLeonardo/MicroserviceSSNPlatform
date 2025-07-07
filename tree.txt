@@ -1,592 +1,484 @@
-Elenco del percorso delle cartelle per il volume Volume
-Numero di serie del volume: 9DEF-AEE0
-D:.
-|   .gitattributes
-|   .gitignore
-|   allifos.txt
-|   Appunti
-|   buildallimmages.bat
-|   CallTests.http
-|   compose.yaml
-|   CreationDDL Updatead
-|   CreationDDLTables
-|   DBInitialPopulator
-|   fixersettigs.py
-|   generated-requests.http
-|   HELP.md
-|   http-client.env.json
-|   infoextractor.py
-|   mvnw
-|   mvnw.cmd
-|   pom.xml
-|   tree.txt
-|   
-+---.idea
-|   |   .gitignore
-|   |   backend.iml
-|   |   compiler.xml
-|   |   dataSources.local.xml
-|   |   dataSources.xml
-|   |   deployment.xml
-|   |   encodings.xml
-|   |   gradle.xml
-|   |   jarRepositories.xml
-|   |   misc.xml
-|   |   modules.xml
-|   |   sqldialects.xml
-|   |   vcs.xml
-|   |   workspace.xml
-|   |   
-|   +---dataSources
-|   |   |   b6041132-14ac-4ed9-902f-05ba8d7fa89b.xml
-|   |   |   
-|   |   \---b6041132-14ac-4ed9-902f-05ba8d7fa89b
-|   |       \---storage_v2
-|   |           \---_src_
-|   |               \---database
-|   |                   |   mydatabase.J7NGgg.meta
-|   |                   |   
-|   |                   \---mydatabase.J7NGgg
-|   |                       \---schema
-|   |                               information_schema.FNRwLQ.meta
-|   |                               pg_catalog.0S1ZNQ.meta
-|   |                               public.abK9xQ.meta
-|   |                               
-|   +---httpRequests
-|   |       2025-07-04T175117.200.json
-|   |       2025-07-04T175119.201.json
-|   |       2025-07-04T175147-1.200.json
-|   |       2025-07-04T175147-1.404.json
-|   |       2025-07-04T175147.200.json
-|   |       2025-07-04T175147.201.json
-|   |       2025-07-04T175147.404.json
-|   |       2025-07-04T175148-1.200.json
-|   |       2025-07-04T175148.200.json
-|   |       2025-07-04T175148.400.json
-|   |       2025-07-04T175148.404.json
-|   |       2025-07-04T180748.200.json
-|   |       2025-07-04T180813.500.json
-|   |       2025-07-04T180838.200.json
-|   |       2025-07-04T193145.200.json
-|   |       2025-07-04T193145.500.json
-|   |       2025-07-04T193146-1.200.json
-|   |       2025-07-04T193146-1.500.json
-|   |       2025-07-04T193146-2.200.json
-|   |       2025-07-04T193146.200.json
-|   |       2025-07-04T193146.404.json
-|   |       2025-07-04T193146.500.json
-|   |       2025-07-04T193147.500.json
-|   |       2025-07-04T225338-1.200.json
-|   |       2025-07-04T225338.200.json
-|   |       2025-07-04T225338.500.json
-|   |       2025-07-04T225339-1.200.json
-|   |       2025-07-04T225339-2.200.json
-|   |       2025-07-04T225339-3.200.json
-|   |       2025-07-04T225339.200.json
-|   |       2025-07-04T225339.404.json
-|   |       2025-07-04T225339.500.json
-|   |       2025-07-04T225354-1.200.json
-|   |       2025-07-04T225354-1.404.json
-|   |       2025-07-04T225354.200.json
-|   |       2025-07-04T225354.400.json
-|   |       2025-07-04T225354.404.json
-|   |       2025-07-04T225354.500.json
-|   |       2025-07-04T225355-1.200.json
-|   |       2025-07-04T225355.200.json
-|   |       2025-07-04T225355.404.json
-|   |       2025-07-04T225401.200.json
-|   |       2025-07-04T225401.500.json
-|   |       2025-07-04T225402-1.200.json
-|   |       2025-07-04T225402-2.200.json
-|   |       2025-07-04T225402-3.200.json
-|   |       2025-07-04T225402-4.200.json
-|   |       2025-07-04T225402.200.json
-|   |       2025-07-04T225402.404.json
-|   |       2025-07-04T225402.500.json
-|   |       http-client.cookies
-|   |       http-requests-log.http
-|   |       
-|   \---inspectionProfiles
-|           Project_Default.xml
-|           
-+---.mvn
-|   \---wrapper
-|           maven-wrapper.properties
-|           
-+---api-gateway
-|   |   .gitattributes
-|   |   .gitignore
-|   |   Dockerfile
-|   |   HELP.md
-|   |   mvnw
-|   |   mvnw.cmd
-|   |   pom.xml
-|   |   
-|   +---.mvn
-|   |   \---wrapper
-|   |           maven-wrapper.properties
-|   |           
-|   +---src
-|   |   +---main
-|   |   |   +---java
-|   |   |   |   \---tassproject
-|   |   |   |       \---apigateway
-|   |   |   |               ApiGatewayApplication.java
-|   |   |   |               
-|   |   |   \---resources
-|   |   |           application.properties
-|   |   |           
-|   |   \---test
-|   |       \---java
-|   |           \---tassproject
-|   |               \---apigateway
-|   |                       ApiGatewayApplicationTests.java
-|   |                       
-|   \---target
-|       |   api-gateway-0.0.1-SNAPSHOT.jar
-|       |   api-gateway-0.0.1-SNAPSHOT.jar.original
-|       |   
-|       +---classes
-|       |   |   application.properties
-|       |   |   
-|       |   \---tassproject
-|       |       \---apigateway
-|       |               ApiGatewayApplication.class
-|       |               
-|       +---generated-sources
-|       |   \---annotations
-|       +---generated-test-sources
-|       |   \---test-annotations
-|       +---maven-archiver
-|       |       pom.properties
-|       |       
-|       +---maven-status
-|       |   \---maven-compiler-plugin
-|       |       +---compile
-|       |       |   \---default-compile
-|       |       |           createdFiles.lst
-|       |       |           inputFiles.lst
-|       |       |           
-|       |       \---testCompile
-|       |           \---default-testCompile
-|       |                   createdFiles.lst
-|       |                   inputFiles.lst
-|       |                   
-|       \---test-classes
-|           \---tassproject
-|               \---apigateway
-|                       ApiGatewayApplicationTests.class
-|                       
-+---common
-|   |   .gitattributes
-|   |   .gitignore
-|   |   HELP.md
-|   |   mvnw
-|   |   mvnw.cmd
-|   |   pom.xml
-|   |   
-|   +---.mvn
-|   |   \---wrapper
-|   |           maven-wrapper.properties
-|   |           
-|   +---src
-|   |   +---main
-|   |   |   +---java
-|   |   |   |   \---tassproject
-|   |   |   |       \---common
-|   |   |   |               CommonApplication.java
-|   |   |   |               
-|   |   |   \---resources
-|   |   |           application.properties
-|   |   |           
-|   |   \---test
-|   |       \---java
-|   |           \---tassproject
-|   |               \---common
-|   |                       CommonApplicationTests.java
-|   |                       
-|   \---target
-|       |   common-0.0.1-SNAPSHOT.jar
-|       |   
-|       +---classes
-|       |   |   application.properties
-|       |   |   
-|       |   \---tassproject
-|       |       \---backend
-|       |           \---common
-|       |                   CommonApplication.class
-|       |                   
-|       +---generated-sources
-|       |   \---annotations
-|       +---generated-test-sources
-|       |   \---test-annotations
-|       +---maven-archiver
-|       |       pom.properties
-|       |       
-|       +---maven-status
-|       |   \---maven-compiler-plugin
-|       |       +---compile
-|       |       |   \---default-compile
-|       |       |           createdFiles.lst
-|       |       |           inputFiles.lst
-|       |       |           
-|       |       \---testCompile
-|       |           \---default-testCompile
-|       |                   createdFiles.lst
-|       |                   inputFiles.lst
-|       |                   
-|       \---test-classes
-|           \---tassproject
-|               \---common
-|                       CommonApplicationTests.class
-|                       
-+---db
-|   \---initdb
-+---dispensation-service
-|   |   .gitattributes
-|   |   .gitignore
-|   |   Dockerfile
-|   |   HELP.md
-|   |   mvnw
-|   |   mvnw.cmd
-|   |   pom.xml
-|   |   
-|   +---.mvn
-|   |   \---wrapper
-|   |           maven-wrapper.properties
-|   |           
-|   +---src
-|   |   +---main
-|   |   |   +---java
-|   |   |   |   |   DispensationRepository.java
-|   |   |   |   |   
-|   |   |   |   \---tassproject
-|   |   |   |       \---dispensationservice
-|   |   |   |               CreateDispensationRequest.java
-|   |   |   |               Dispensation.java
-|   |   |   |               DispensationApplicationService.java
-|   |   |   |               DispensationController.java
-|   |   |   |               DispensationResponse.java
-|   |   |   |               DispensationServiceApplication.java
-|   |   |   |               RabbitConfig.java
-|   |   |   |               
-|   |   |   \---resources
-|   |   |           application.properties
-|   |   |           
-|   |   \---test
-|   |       \---java
-|   |           \---tassproject
-|   |               \---dispensationservice
-|   |                       DispensationRepositoryIT.java
-|   |                       DispensationServiceApplicationTests.java
-|   |                       
-|   \---target
-|       |   dispensation-service-0.0.1-SNAPSHOT.jar
-|       |   dispensation-service-0.0.1-SNAPSHOT.jar.original
-|       |   
-|       +---classes
-|       |   |   application.properties
-|       |   |   
-|       |   \---tassproject
-|       |       \---dispensationservice
-|       |           |   CreateDispensationRequest.class
-|       |           |   Dispensation$Status.class
-|       |           |   Dispensation.class
-|       |           |   DispensationApplicationService.class
-|       |           |   DispensationController.class
-|       |           |   DispensationResponse.class
-|       |           |   DispensationServiceApplication.class
-|       |           |   
-|       |           \---repository
-|       |                   DispensationRepository.class
-|       |                   
-|       +---generated-sources
-|       |   \---annotations
-|       +---generated-test-sources
-|       |   \---test-annotations
-|       +---maven-archiver
-|       |       pom.properties
-|       |       
-|       +---maven-status
-|       |   \---maven-compiler-plugin
-|       |       +---compile
-|       |       |   \---default-compile
-|       |       |           createdFiles.lst
-|       |       |           inputFiles.lst
-|       |       |           
-|       |       \---testCompile
-|       |           \---default-testCompile
-|       |                   createdFiles.lst
-|       |                   inputFiles.lst
-|       |                   
-|       \---test-classes
-|           \---tassproject
-|               \---dispensationservice
-|                       DispensationRepositoryIT.class
-|                       DispensationServiceApplicationTests.class
-|                       
-+---inventory-service
-|   |   .gitattributes
-|   |   .gitignore
-|   |   Dockerfile
-|   |   HELP.md
-|   |   inventory-service.iml
-|   |   mvnw
-|   |   mvnw.cmd
-|   |   pom.xml
-|   |   
-|   +---.mvn
-|   |   \---wrapper
-|   |           maven-wrapper.properties
-|   |           
-|   +---src
-|   |   +---main
-|   |   |   +---java
-|   |   |   |   \---tassproject
-|   |   |   |       \---inventoryservice
-|   |   |   |               AvailabilityResponse.java
-|   |   |   |               InventoryApplicationService.java
-|   |   |   |               InventoryController.java
-|   |   |   |               InventoryItem.java
-|   |   |   |               InventoryItemRepository.java
-|   |   |   |               InventoryServiceApplication.java
-|   |   |   |               
-|   |   |   \---resources
-|   |   |           application.properties
-|   |   |           
-|   |   \---test
-|   |       \---java
-|   |           \---tassproject
-|   |               \---inventoryservice
-|   |                       InventoryItemRepositoryIT.java
-|   |                       InventoryServiceApplicationTests.java
-|   |                       
-|   \---target
-|       |   inventory-service-0.0.1-SNAPSHOT.jar
-|       |   inventory-service-0.0.1-SNAPSHOT.jar.original
-|       |   
-|       +---classes
-|       |   |   application.properties
-|       |   |   
-|       |   \---tassproject
-|       |       \---inventoryservice
-|       |           |   AvailabilityResponse.class
-|       |           |   InventoryApplicationService.class
-|       |           |   InventoryController.class
-|       |           |   InventoryItem.class
-|       |           |   InventoryServiceApplication.class
-|       |           |   
-|       |           \---repository
-|       |                   InventoryItemRepository.class
-|       |                   
-|       +---generated-sources
-|       |   \---annotations
-|       +---generated-test-sources
-|       |   \---test-annotations
-|       +---maven-archiver
-|       |       pom.properties
-|       |       
-|       +---maven-status
-|       |   \---maven-compiler-plugin
-|       |       +---compile
-|       |       |   \---default-compile
-|       |       |           createdFiles.lst
-|       |       |           inputFiles.lst
-|       |       |           
-|       |       \---testCompile
-|       |           \---default-testCompile
-|       |                   createdFiles.lst
-|       |                   inputFiles.lst
-|       |                   
-|       \---test-classes
-|           \---tassproject
-|               \---inventoryservice
-|                       InventoryItemRepositoryIT.class
-|                       InventoryServiceApplicationTests.class
-|                       
-+---notification-service
-|   |   .gitattributes
-|   |   .gitignore
-|   |   Dockerfile
-|   |   HELP.md
-|   |   mvnw
-|   |   mvnw.cmd
-|   |   pom.xml
-|   |   
-|   +---.mvn
-|   |   \---wrapper
-|   |           maven-wrapper.properties
-|   |           
-|   +---src
-|   |   +---main
-|   |   |   +---java
-|   |   |   |   \---tassproject
-|   |   |   |       \---notificationservice
-|   |   |   |               NotificationController.java
-|   |   |   |               NotificationServiceApplication.java
-|   |   |   |               RabbitConfig.java
-|   |   |   |               SendNotificationRequest.java
-|   |   |   |               
-|   |   |   \---resources
-|   |   |           application.properties
-|   |   |           
-|   |   \---test
-|   |       \---java
-|   |           \---tassproject
-|   |               \---notificationservice
-|   |                       NotificationServiceApplicationTests.java
-|   |                       
-|   \---target
-|       |   notification-service-0.0.1-SNAPSHOT.jar
-|       |   notification-service-0.0.1-SNAPSHOT.jar.original
-|       |   
-|       +---classes
-|       |   |   application.properties
-|       |   |   
-|       |   \---tassproject
-|       |       \---notificationservice
-|       |               NotificationController.class
-|       |               NotificationServiceApplication.class
-|       |               RabbitConfig.class
-|       |               SendNotificationRequest$Type.class
-|       |               SendNotificationRequest.class
-|       |               
-|       +---generated-sources
-|       |   \---annotations
-|       +---generated-test-sources
-|       |   \---test-annotations
-|       +---maven-archiver
-|       |       pom.properties
-|       |       
-|       +---maven-status
-|       |   \---maven-compiler-plugin
-|       |       +---compile
-|       |       |   \---default-compile
-|       |       |           createdFiles.lst
-|       |       |           inputFiles.lst
-|       |       |           
-|       |       \---testCompile
-|       |           \---default-testCompile
-|       |                   createdFiles.lst
-|       |                   inputFiles.lst
-|       |                   
-|       \---test-classes
-|           \---tassproject
-|               \---notificationservice
-|                       NotificationServiceApplicationTests.class
-|                       
-+---postgres-init
-|   \---init-schemas.sql
-+---prescription-service
-|   |   .gitattributes
-|   |   .gitignore
-|   |   Dockerfile
-|   |   HELP.md
-|   |   mvnw
-|   |   mvnw.cmd
-|   |   pom.xml
-|   |   
-|   +---.mvn
-|   |   \---wrapper
-|   |           maven-wrapper.properties
-|   |           
-|   +---src
-|   |   +---main
-|   |   |   +---java
-|   |   |   |   \---tassproject
-|   |   |   |       \---prescriptionservice
-|   |   |   |               CreatePrescriptionRequest.java
-|   |   |   |               GlobalExceptionHandler.java
-|   |   |   |               Prescription.java
-|   |   |   |               PrescriptionApplicationService.java
-|   |   |   |               PrescriptionController.java
-|   |   |   |               PrescriptionItem.java
-|   |   |   |               PrescriptionItemDto.java
-|   |   |   |               PrescriptionItemRepository.java
-|   |   |   |               PrescriptionRepository.java
-|   |   |   |               PrescriptionResponse.java
-|   |   |   |               PrescriptionServiceApplication.java
-|   |   |   |               RabbitConfig.java
-|   |   |   |               UpdatePrescriptionStatusRequest.java
-|   |   |   |               
-|   |   |   \---resources
-|   |   |           application.properties
-|   |   |           
-|   |   \---test
-|   |       \---java
-|   |           \---tassproject
-|   |               \---prescriptionservice
-|   |                       PrescriptionRepositoryIT.java
-|   |                       PrescriptionServiceApplicationTests.java
-|   |                       
-|   \---target
-|       |   prescription-service-0.0.1-SNAPSHOT.jar
-|       |   prescription-service-0.0.1-SNAPSHOT.jar.original
-|       |   
-|       +---classes
-|       |   |   application.properties
-|       |   |   
-|       |   \---tassproject
-|       |       \---prescriptionservice
-|       |           |   CreatePrescriptionRequest.class
-|       |           |   Prescription$Status.class
-|       |           |   Prescription.class
-|       |           |   PrescriptionApplicationService$1.class
-|       |           |   PrescriptionApplicationService.class
-|       |           |   PrescriptionController.class
-|       |           |   PrescriptionItem.class
-|       |           |   PrescriptionItemDto.class
-|       |           |   PrescriptionResponse.class
-|       |           |   PrescriptionServiceApplication.class
-|       |           |   UpdatePrescriptionStatusRequest.class
-|       |           |   
-|       |           \---repository
-|       |                   PrescriptionItemRepository.class
-|       |                   PrescriptionRepository.class
-|       |                   
-|       +---generated-sources
-|       |   \---annotations
-|       +---generated-test-sources
-|       |   \---test-annotations
-|       +---maven-archiver
-|       |       pom.properties
-|       |       
-|       +---maven-status
-|       |   \---maven-compiler-plugin
-|       |       +---compile
-|       |       |   \---default-compile
-|       |       |           createdFiles.lst
-|       |       |           inputFiles.lst
-|       |       |           
-|       |       \---testCompile
-|       |           \---default-testCompile
-|       |                   createdFiles.lst
-|       |                   inputFiles.lst
-|       |                   
-|       \---test-classes
-|           \---tassproject
-|               \---prescriptionservice
-|                       PrescriptionRepositoryIT.class
-|                       PrescriptionServiceApplicationTests.class
-|                       
-\---src
-    +---main
-    |   +---java
-    |   |   \---tassproject
-    |   |       \---backend
-    |   |               BackendApplication.java
-    |   |               
-    |   +---proto
-    |   \---resources
-    |       |   application.properties
-    |       |   
-    |       +---graphql
-    |       +---graphql-client
-    |       +---static
-    |       \---templates
-    \---test
-        \---java
-            \---tassproject
-                \---backend
-                        BackendApplicationTests.java
-                        
+.
+├── API description
+├── ApiGatewayTest.http
+├── Appunti
+├── CallTests.http
+├── CreationDDL Updatead
+├── CreationDDLTables
+├── DBInitialPopulator
+├── HELP.md
+├── allifos.txt
+├── api-gateway
+│   ├── Dockerfile
+│   ├── HELP.md
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── tassproject
+│   │   │   │       └── apigateway
+│   │   │   │           ├── ApiGatewayApplication.java
+│   │   │   │           └── SecurityConfig.java
+│   │   │   └── resources
+│   │   │       ├── application.properties
+│   │   │       └── application.yml
+│   │   └── test
+│   │       └── java
+│   │           └── tassproject
+│   │               └── apigateway
+│   │                   └── ApiGatewayApplicationTests.java
+│   └── target
+│       ├── api-gateway-0.0.1-SNAPSHOT.jar
+│       ├── api-gateway-0.0.1-SNAPSHOT.jar.original
+│       ├── classes
+│       │   ├── application.properties
+│       │   ├── application.yml
+│       │   └── tassproject
+│       │       └── apigateway
+│       │           ├── ApiGatewayApplication.class
+│       │           └── SecurityConfig.class
+│       ├── generated-sources
+│       │   └── annotations
+│       ├── generated-test-sources
+│       │   └── test-annotations
+│       ├── maven-archiver
+│       │   └── pom.properties
+│       ├── maven-status
+│       │   └── maven-compiler-plugin
+│       │       ├── compile
+│       │       │   └── default-compile
+│       │       │       ├── createdFiles.lst
+│       │       │       └── inputFiles.lst
+│       │       └── testCompile
+│       │           └── default-testCompile
+│       │               ├── createdFiles.lst
+│       │               └── inputFiles.lst
+│       └── test-classes
+│           └── tassproject
+│               └── apigateway
+│                   └── ApiGatewayApplicationTests.class
+├── auth-service
+│   ├── Dockerfile
+│   ├── HELP.md
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── tassproject
+│   │   │   │       └── authservice
+│   │   │   │           ├── AuthController.java
+│   │   │   │           ├── AuthResponse.java
+│   │   │   │           ├── AuthService.java
+│   │   │   │           ├── AuthServiceApplication.java
+│   │   │   │           ├── JwtUtil.java
+│   │   │   │           ├── LoginRequest.java
+│   │   │   │           ├── RegisterRequest.java
+│   │   │   │           ├── Role.java
+│   │   │   │           ├── SecurityConfig.java
+│   │   │   │           ├── User.java
+│   │   │   │           └── UserRepository.java
+│   │   │   └── resources
+│   │   │       └── application.properties
+│   │   └── test
+│   │       └── java
+│   │           └── tassproject
+│   │               └── authservice
+│   │                   └── AuthServiceApplicationTests.java
+│   └── target
+│       ├── auth-service-0.0.1-SNAPSHOT.jar
+│       ├── auth-service-0.0.1-SNAPSHOT.jar.original
+│       ├── classes
+│       │   ├── application.properties
+│       │   └── tassproject
+│       │       └── authservice
+│       │           ├── AuthResponse.class
+│       │           ├── AuthService.class
+│       │           ├── AuthServiceApplication.class
+│       │           ├── LoginRequest.class
+│       │           ├── RegisterRequest.class
+│       │           ├── Role.class
+│       │           ├── SecurityConfig.class
+│       │           ├── User.class
+│       │           ├── controller
+│       │           │   └── AuthController.class
+│       │           ├── repository
+│       │           │   └── UserRepository.class
+│       │           └── security
+│       │               └── JwtUtil.class
+│       ├── generated-sources
+│       │   └── annotations
+│       ├── generated-test-sources
+│       │   └── test-annotations
+│       ├── maven-archiver
+│       │   └── pom.properties
+│       ├── maven-status
+│       │   └── maven-compiler-plugin
+│       │       ├── compile
+│       │       │   └── default-compile
+│       │       │       ├── createdFiles.lst
+│       │       │       └── inputFiles.lst
+│       │       └── testCompile
+│       │           └── default-testCompile
+│       │               ├── createdFiles.lst
+│       │               └── inputFiles.lst
+│       └── test-classes
+│           └── tassproject
+│               └── authservice
+│                   └── AuthServiceApplicationTests.class
+├── buildallimmages.bat
+├── common
+│   ├── HELP.md
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── tassproject
+│   │   │   │       └── common
+│   │   │   │           └── CommonApplication.java
+│   │   │   └── resources
+│   │   │       └── application.properties
+│   │   └── test
+│   │       └── java
+│   │           └── tassproject
+│   │               └── common
+│   │                   └── CommonApplicationTests.java
+│   └── target
+│       ├── classes
+│       │   ├── application.properties
+│       │   └── tassproject
+│       │       └── backend
+│       │           └── common
+│       │               └── CommonApplication.class
+│       ├── common-0.0.1-SNAPSHOT.jar
+│       ├── generated-sources
+│       │   └── annotations
+│       ├── generated-test-sources
+│       │   └── test-annotations
+│       ├── maven-archiver
+│       │   └── pom.properties
+│       ├── maven-status
+│       │   └── maven-compiler-plugin
+│       │       ├── compile
+│       │       │   └── default-compile
+│       │       │       ├── createdFiles.lst
+│       │       │       └── inputFiles.lst
+│       │       └── testCompile
+│       │           └── default-testCompile
+│       │               ├── createdFiles.lst
+│       │               └── inputFiles.lst
+│       └── test-classes
+│           └── tassproject
+│               └── common
+│                   └── CommonApplicationTests.class
+├── compose.yaml
+├── db
+│   └── initdb
+├── dispensation-service
+│   ├── Dockerfile
+│   ├── HELP.md
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   ├── DispensationRepository.java
+│   │   │   │   └── tassproject
+│   │   │   │       └── dispensationservice
+│   │   │   │           ├── CreateDispensationRequest.java
+│   │   │   │           ├── Dispensation.java
+│   │   │   │           ├── DispensationApplicationService.java
+│   │   │   │           ├── DispensationController.java
+│   │   │   │           ├── DispensationResponse.java
+│   │   │   │           ├── DispensationServiceApplication.java
+│   │   │   │           └── RabbitConfig.java
+│   │   │   └── resources
+│   │   │       └── application.properties
+│   │   └── test
+│   │       └── java
+│   │           └── tassproject
+│   │               └── dispensationservice
+│   │                   ├── DispensationRepositoryIT.java
+│   │                   └── DispensationServiceApplicationTests.java
+│   └── target
+│       ├── classes
+│       │   ├── application.properties
+│       │   └── tassproject
+│       │       └── dispensationservice
+│       │           ├── CreateDispensationRequest.class
+│       │           ├── Dispensation$Status.class
+│       │           ├── Dispensation.class
+│       │           ├── DispensationApplicationService.class
+│       │           ├── DispensationController.class
+│       │           ├── DispensationResponse.class
+│       │           ├── DispensationServiceApplication.class
+│       │           ├── RabbitConfig.class
+│       │           └── repository
+│       │               └── DispensationRepository.class
+│       ├── dispensation-service-0.0.1-SNAPSHOT.jar
+│       ├── dispensation-service-0.0.1-SNAPSHOT.jar.original
+│       ├── generated-sources
+│       │   └── annotations
+│       ├── generated-test-sources
+│       │   └── test-annotations
+│       ├── maven-archiver
+│       │   └── pom.properties
+│       ├── maven-status
+│       │   └── maven-compiler-plugin
+│       │       ├── compile
+│       │       │   └── default-compile
+│       │       │       ├── createdFiles.lst
+│       │       │       └── inputFiles.lst
+│       │       └── testCompile
+│       │           └── default-testCompile
+│       │               ├── createdFiles.lst
+│       │               └── inputFiles.lst
+│       └── test-classes
+│           └── tassproject
+│               └── dispensationservice
+│                   ├── DispensationRepositoryIT.class
+│                   └── DispensationServiceApplicationTests.class
+├── generated-requests.http
+├── http-client.env.json
+├── infoextractor.py
+├── inventory-service
+│   ├── Dockerfile
+│   ├── HELP.md
+│   ├── inventory-service.iml
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── tassproject
+│   │   │   │       └── inventoryservice
+│   │   │   │           ├── AvailabilityResponse.java
+│   │   │   │           ├── GlobalExceptionHandler.java
+│   │   │   │           ├── InventoryApplicationService.java
+│   │   │   │           ├── InventoryController.java
+│   │   │   │           ├── InventoryItem.java
+│   │   │   │           ├── InventoryItemRepository.java
+│   │   │   │           ├── InventoryServiceApplication.java
+│   │   │   │           └── ReserveInventoryRequest.java
+│   │   │   └── resources
+│   │   │       ├── application.properties
+│   │   │       └── db
+│   │   │           └── migration
+│   │   │               └── V1__drop_inventory_items_drug_fk.sql
+│   │   └── test
+│   │       └── java
+│   │           └── tassproject
+│   │               └── inventoryservice
+│   │                   ├── InventoryItemRepositoryIT.java
+│   │                   └── InventoryServiceApplicationTests.java
+│   └── target
+│       ├── classes
+│       │   ├── application.properties
+│       │   ├── db
+│       │   │   └── migration
+│       │   │       └── V1__drop_inventory_items_drug_fk.sql
+│       │   └── tassproject
+│       │       └── inventoryservice
+│       │           ├── AvailabilityResponse.class
+│       │           ├── GlobalExceptionHandler$ErrorDTO.class
+│       │           ├── GlobalExceptionHandler.class
+│       │           ├── InventoryApplicationService.class
+│       │           ├── InventoryController.class
+│       │           ├── InventoryItem.class
+│       │           ├── InventoryServiceApplication.class
+│       │           ├── ReserveInventoryRequest.class
+│       │           └── repository
+│       │               └── InventoryItemRepository.class
+│       ├── generated-sources
+│       │   └── annotations
+│       ├── generated-test-sources
+│       │   └── test-annotations
+│       ├── inventory-service-0.0.1-SNAPSHOT.jar
+│       ├── inventory-service-0.0.1-SNAPSHOT.jar.original
+│       ├── maven-archiver
+│       │   └── pom.properties
+│       ├── maven-status
+│       │   └── maven-compiler-plugin
+│       │       ├── compile
+│       │       │   └── default-compile
+│       │       │       ├── createdFiles.lst
+│       │       │       └── inputFiles.lst
+│       │       └── testCompile
+│       │           └── default-testCompile
+│       │               ├── createdFiles.lst
+│       │               └── inputFiles.lst
+│       └── test-classes
+│           └── tassproject
+│               └── inventoryservice
+│                   ├── InventoryItemRepositoryIT.class
+│                   └── InventoryServiceApplicationTests.class
+├── mvnw
+├── mvnw.cmd
+├── notification-service
+│   ├── Dockerfile
+│   ├── HELP.md
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── tassproject
+│   │   │   │       └── notificationservice
+│   │   │   │           ├── NotificationController.java
+│   │   │   │           ├── NotificationServiceApplication.java
+│   │   │   │           ├── RabbitConfig.java
+│   │   │   │           └── SendNotificationRequest.java
+│   │   │   └── resources
+│   │   │       └── application.properties
+│   │   └── test
+│   │       └── java
+│   │           └── tassproject
+│   │               └── notificationservice
+│   │                   └── NotificationServiceApplicationTests.java
+│   └── target
+│       ├── classes
+│       │   ├── application.properties
+│       │   └── tassproject
+│       │       └── notificationservice
+│       │           ├── NotificationController.class
+│       │           ├── NotificationServiceApplication.class
+│       │           ├── RabbitConfig.class
+│       │           ├── SendNotificationRequest$Type.class
+│       │           └── SendNotificationRequest.class
+│       ├── generated-sources
+│       │   └── annotations
+│       ├── generated-test-sources
+│       │   └── test-annotations
+│       ├── maven-archiver
+│       │   └── pom.properties
+│       ├── maven-status
+│       │   └── maven-compiler-plugin
+│       │       ├── compile
+│       │       │   └── default-compile
+│       │       │       ├── createdFiles.lst
+│       │       │       └── inputFiles.lst
+│       │       └── testCompile
+│       │           └── default-testCompile
+│       │               ├── createdFiles.lst
+│       │               └── inputFiles.lst
+│       ├── notification-service-0.0.1-SNAPSHOT.jar
+│       ├── notification-service-0.0.1-SNAPSHOT.jar.original
+│       └── test-classes
+│           └── tassproject
+│               └── notificationservice
+│                   └── NotificationServiceApplicationTests.class
+├── pom.xml
+├── postgres-init
+│   └── init-schemas.sql
+├── prescription-service
+│   ├── Dockerfile
+│   ├── HELP.md
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   ├── src
+│   │   ├── main
+│   │   │   ├── java
+│   │   │   │   └── tassproject
+│   │   │   │       └── prescriptionservice
+│   │   │   │           ├── CreatePrescriptionRequest.java
+│   │   │   │           ├── GlobalExceptionHandler.java
+│   │   │   │           ├── Prescription.java
+│   │   │   │           ├── PrescriptionApplicationService.java
+│   │   │   │           ├── PrescriptionController.java
+│   │   │   │           ├── PrescriptionItem.java
+│   │   │   │           ├── PrescriptionItemDto.java
+│   │   │   │           ├── PrescriptionItemRepository.java
+│   │   │   │           ├── PrescriptionRepository.java
+│   │   │   │           ├── PrescriptionResponse.java
+│   │   │   │           ├── PrescriptionServiceApplication.java
+│   │   │   │           ├── RabbitConfig.java
+│   │   │   │           └── UpdatePrescriptionStatusRequest.java
+│   │   │   └── resources
+│   │   │       ├── application.properties
+│   │   │       └── db
+│   │   │           └── migration
+│   │   │               └── V1__drop_foreign_keys.sql
+│   │   └── test
+│   │       └── java
+│   │           └── tassproject
+│   │               └── prescriptionservice
+│   │                   ├── PrescriptionRepositoryIT.java
+│   │                   └── PrescriptionServiceApplicationTests.java
+│   └── target
+│       ├── classes
+│       │   ├── application.properties
+│       │   ├── db
+│       │   │   └── migration
+│       │   │       └── V1__drop_foreign_keys.sql
+│       │   └── tassproject
+│       │       └── prescriptionservice
+│       │           ├── CreatePrescriptionRequest.class
+│       │           ├── GlobalExceptionHandler$ErrorDTO.class
+│       │           ├── GlobalExceptionHandler.class
+│       │           ├── Prescription$Status.class
+│       │           ├── Prescription.class
+│       │           ├── PrescriptionApplicationService$1.class
+│       │           ├── PrescriptionApplicationService.class
+│       │           ├── PrescriptionController.class
+│       │           ├── PrescriptionItem.class
+│       │           ├── PrescriptionItemDto.class
+│       │           ├── PrescriptionResponse.class
+│       │           ├── PrescriptionServiceApplication.class
+│       │           ├── RabbitConfig.class
+│       │           ├── UpdatePrescriptionStatusRequest.class
+│       │           └── repository
+│       │               ├── PrescriptionItemRepository.class
+│       │               └── PrescriptionRepository.class
+│       ├── generated-sources
+│       │   └── annotations
+│       ├── generated-test-sources
+│       │   └── test-annotations
+│       ├── maven-archiver
+│       │   └── pom.properties
+│       ├── maven-status
+│       │   └── maven-compiler-plugin
+│       │       ├── compile
+│       │       │   └── default-compile
+│       │       │       ├── createdFiles.lst
+│       │       │       └── inputFiles.lst
+│       │       └── testCompile
+│       │           └── default-testCompile
+│       │               ├── createdFiles.lst
+│       │               └── inputFiles.lst
+│       ├── prescription-service-0.0.1-SNAPSHOT.jar
+│       ├── prescription-service-0.0.1-SNAPSHOT.jar.original
+│       └── test-classes
+│           └── tassproject
+│               └── prescriptionservice
+│                   ├── PrescriptionRepositoryIT.class
+│                   └── PrescriptionServiceApplicationTests.class
+├── src
+│   ├── main
+│   │   ├── java
+│   │   │   └── tassproject
+│   │   │       └── backend
+│   │   │           └── BackendApplication.java
+│   │   ├── proto
+│   │   └── resources
+│   │       ├── application.properties
+│   │       ├── graphql
+│   │       ├── graphql-client
+│   │       ├── static
+│   │       └── templates
+│   └── test
+│       └── java
+│           └── tassproject
+│               └── backend
+│                   └── BackendApplicationTests.java
+└── tree.txt
+
+237 directories, 244 files

@@ -18,12 +18,16 @@ spring:
       # 2) rotte verso i micro-servizi
       routes:
 
+        # ────────────────── Auth-Service ──────────────────
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:http://auth-service:8080}
+          predicates:
+            - Path=/api/v1/auth/**
+
         # ────────────────── Prescription-Service ──────────────────
         - id: prescription-service
           uri: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
           predicates:
-            # Attenzione: non si può più mettere ** in mezzo ad un path,
-            # perciò usiamo {patientId} come placeholder di un singolo segmento.
             - Path=/api/v1/prescriptions/**,/api/v1/patients/{patientId}/prescriptions/**
 
         # ────────────────── Dispensation-Service ──────────────────

@@ -22,6 +22,17 @@
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-gateway</artifactId>
         </dependency>
+
+        <!-- 🔐 sicurezza & JWT resource-server -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
@@ -50,12 +61,61 @@ package tassproject.apigateway;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 
-@SpringBootApplication
+@SpringBootApplication(
+        exclude = SecurityAutoConfiguration.class
+)
 public class ApiGatewayApplication {
-
     public static void main(String[] args) {
         SpringApplication.run(ApiGatewayApplication.class, args);
+    }
+}
+
+
+### File: api-gateway/src/main/java/tassproject/apigateway/SecurityConfig.java
+----------------------------------------
+package tassproject.apigateway;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+
+@Configuration
+@EnableWebFluxSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        http
+                .csrf(csrf -> csrf.disable())
+                .authorizeExchange(exchanges -> exchanges
+                        .pathMatchers("/api/v1/auth/**", "/actuator/**").permitAll()
+                        .anyExchange().authenticated()
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt()
+                );
+        return http.build();
+    }
+
+    @Bean
+    public ReactiveJwtDecoder jwtDecoder(
+            @Value("${jwt.secret:my_jwt_secret}") String secret) {
+
+        SecretKey key = new SecretKeySpec(
+                secret.getBytes(StandardCharsets.UTF_8),
+                "HmacSHA256"
+        );
+        return NimbusReactiveJwtDecoder.withSecretKey(key).build();
     }
 }
 
@@ -71,6 +131,9 @@ server.port=${SERVER_PORT:8080}
 
 # Health endpoint
 management.endpoints.web.exposure.include=health,info
+
+# === JWT segreto condiviso con auth-service ===
+jwt.secret=${JWT_SECRET:my_jwt_secret}
 
 
 ### File: api-gateway/src/main/resources/application.yml
@@ -95,12 +158,16 @@ spring:
       # 2) rotte verso i micro-servizi
       routes:
 
+        # ────────────────── Auth-Service ──────────────────
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:http://auth-service:8080}
+          predicates:
+            - Path=/api/v1/auth/**
+
         # ────────────────── Prescription-Service ──────────────────
         - id: prescription-service
           uri: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
           predicates:
-            # Attenzione: non si può più mettere ** in mezzo ad un path,
-            # perciò usiamo {patientId} come placeholder di un singolo segmento.
             - Path=/api/v1/prescriptions/**,/api/v1/patients/{patientId}/prescriptions/**
 
         # ────────────────── Dispensation-Service ──────────────────
@@ -144,6 +211,698 @@ class ApiGatewayApplicationTests {
     @Test
     void contextLoads() {
     }
+}
+
+
+### File: auth-service/pom.xml
+----------------------------------------
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>tassproject.backend</groupId>
+        <artifactId>backend</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>auth-service</artifactId>
+    <name>auth-service</name>
+    <packaging>jar</packaging>
+
+    <properties>
+        <java.version>17</java.version>
+        <jjwt.version>0.12.5</jjwt.version>
+    </properties>
+
+    <dependencies>
+        <!-- Core -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- JWT -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Annotation API per javax.annotation.PostConstruct -->
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>1.3.2</version>
+        </dependency>
+
+        <!-- Validation & Lombok -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+### File: auth-service/src/main/java/tassproject/authservice/AuthController.java
+----------------------------------------
+package tassproject.authservice.controller;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import tassproject.authservice.*;
+import tassproject.authservice.AuthService;
+
+@RestController
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
+public class AuthController {
+
+    private final AuthService auth;
+
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AuthResponse register(@Valid @RequestBody RegisterRequest body) {
+        return auth.register(body);
+    }
+
+    @PostMapping("/login")
+    public AuthResponse login(@Valid @RequestBody LoginRequest body) {
+        return auth.login(body);
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/AuthResponse.java
+----------------------------------------
+package tassproject.authservice;
+
+public record AuthResponse(String tokenType, String accessToken) {
+    public static AuthResponse bearer(String jwt) {
+        return new AuthResponse("Bearer", jwt);
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/AuthService.java
+----------------------------------------
+package tassproject.authservice;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import tassproject.authservice.repository.UserRepository;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserRepository users;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
+
+    /* ───────── REGISTER ───────── */
+
+    public AuthResponse register(RegisterRequest request) {
+        String username = request.email().toLowerCase();
+
+        if (users.findByUsername(username).isPresent()) {
+            throw new IllegalArgumentException("Username già in uso");
+        }
+
+        User user = new User(
+                username,
+                passwordEncoder.encode(request.password()),
+                request.role()
+        );
+
+        users.save(user);
+
+        String token = jwtUtil.generateToken(user);
+        return new AuthResponse("Bearer", token);
+    }
+
+    /* ─────────  LOGIN  ───────── */
+
+    public AuthResponse login(LoginRequest request) {
+        User user = users.findByUsername(request.email().toLowerCase())
+                .orElseThrow(() -> new IllegalArgumentException("Credenziali non valide"));
+
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new IllegalArgumentException("Credenziali non valide");
+        }
+
+        String token = jwtUtil.generateToken(user);
+        return new AuthResponse("Bearer", token);
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/AuthServiceApplication.java
+----------------------------------------
+package tassproject.authservice;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class AuthServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(AuthServiceApplication.class, args);
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/GlobalExceptionHandler.java
+----------------------------------------
+package tassproject.authservice;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.HttpStatus;
+
+import java.util.stream.Collectors;
+
+@ControllerAdvice
+public class GlobalExceptionHandler {
+
+    public record ErrorResponse(String error, String message) {}
+
+    // Validazione @Valid fallita → 400 Bad Request
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+        String details = ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                .collect(Collectors.joining("; "));
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("Validation Failed", details));
+    }
+
+    // IllegalArgumentException dal business logic → 400 Bad Request
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("Bad Request", ex.getMessage()));
+    }
+
+    // Fallback per qualsiasi altra eccezione → 500 Internal Server Error
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleAll(Exception ex) {
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse("Internal Server Error", ex.getMessage()));
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/JwtUtil.java
+----------------------------------------
+package tassproject.authservice;
+
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.io.DecodingException;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import javax.annotation.PostConstruct;
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
+@Component
+public class JwtUtil {
+
+    @Value("${jwt.secret}")
+    private String secretValue;
+
+    @Value("${jwt.expiration}")
+    private long jwtExpirationMs;
+
+    private SecretKey key;
+
+    @PostConstruct
+    public void init() {
+        byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64.decode(secretValue);
+        } catch (IllegalArgumentException | DecodingException ex) {
+            keyBytes = secretValue.getBytes(StandardCharsets.UTF_8);
+        }
+
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException(
+                    "Il JWT_SECRET configurato è troppo corto (" +
+                            (keyBytes.length * 8) + " bit). " +
+                            "Deve essere almeno 256 bit. Genera con: openssl rand -base64 32"
+            );
+        }
+
+        this.key = Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public String generateToken(User user) {
+        return Jwts.builder()
+                .setSubject(user.getUsername())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String getUsernameFromToken(String token) {
+        return Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
+            return true;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/LoginRequest.java
+----------------------------------------
+package tassproject.authservice;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
+public record LoginRequest(
+        @NotBlank @Email String email,
+        @NotBlank String password) {}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/RegisterRequest.java
+----------------------------------------
+package tassproject.authservice;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import tassproject.authservice.Role;
+
+public record RegisterRequest(
+        @NotBlank @Email String email,
+        @NotBlank String password,
+        @NotNull Role role) {}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/RestAccessDeniedHandler.java
+----------------------------------------
+package tassproject.authservice;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.stereotype.Component;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@Component
+public class RestAccessDeniedHandler implements AccessDeniedHandler {
+
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    @Override
+    public void handle(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AccessDeniedException accessDeniedException
+    ) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        var error = new GlobalExceptionHandler.ErrorResponse(
+                "Forbidden",
+                accessDeniedException.getMessage()
+        );
+        mapper.writeValue(response.getOutputStream(), error);
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/RestAuthenticationEntryPoint.java
+----------------------------------------
+package tassproject.authservice;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.stereotype.Component;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@Component
+public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
+
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    @Override
+    public void commence(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AuthenticationException authException
+    ) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        // usa lo stesso DTO ErrorResponse del GlobalExceptionHandler
+        var error = new GlobalExceptionHandler.ErrorResponse(
+                "Unauthorized",
+                authException.getMessage()
+        );
+        mapper.writeValue(response.getOutputStream(), error);
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/Role.java
+----------------------------------------
+package tassproject.authservice;
+
+public enum Role {
+    PATIENT,
+    MEDICO,
+    FARMACISTA,
+    SSN_ADMIN
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/SecurityConfig.java
+----------------------------------------
+package tassproject.authservice;
+
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import tassproject.authservice.repository.UserRepository;
+
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final UserRepository users;
+    private final RestAuthenticationEntryPoint restEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
+
+    // -------- UserDetailsService --------
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> users.findByUsername(username.toLowerCase())
+                .map(user -> org.springframework.security.core.userdetails.User
+                        .withUsername(user.getUsername())
+                        .password(user.getPassword())
+                        .roles(user.getRole().name())
+                        .build())
+                .orElseThrow(() ->
+                        new UsernameNotFoundException("Utente non trovato: " + username));
+    }
+
+    // -------- Encoder / AuthenticationManager --------
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(UserDetailsService uds) {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(uds);
+        provider.setPasswordEncoder(passwordEncoder());
+        return new ProviderManager(provider);
+    }
+
+    // -------- JWT encoder/decoder --------
+    @Bean
+    public JwtEncoder jwtEncoder(@Value("${jwt.secret:my_jwt_secret}") String secret) {
+        return new NimbusJwtEncoder(new ImmutableSecret<>(secret.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Bean
+    public JwtDecoder jwtDecoder(@Value("${jwt.secret:my_jwt_secret}") String secret) {
+        return NimbusJwtDecoder
+                .withSecretKey(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"))
+                .build();
+    }
+
+    // -------- Security filter chain --------
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth
+                        // permettiamo TUTTI i metodi su /api/v1/auth/** e actuator
+                        .requestMatchers("/api/v1/auth/**", "/actuator/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                // gestori personalizzati per 401 e 403 -> restituiscono JSON
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(restEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler)
+                )
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authenticationManager(authenticationManager(userDetailsService()))
+                .oauth2Login(Customizer.withDefaults())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+
+        return http.build();
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/User.java
+----------------------------------------
+package tassproject.authservice;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "users")
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String username;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
+
+    public User() {}
+
+    public User(String username, String password, Role role) {
+        this.username = username;
+        this.password = password;
+        this.role = role;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/UserRepository.java
+----------------------------------------
+package tassproject.authservice.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.authservice.User;
+
+import java.util.Optional;
+
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    /* Cerca l’utente per username (e-mail normalizzata) */
+    Optional<User> findByUsername(String username);
+}
+
+
+### File: auth-service/src/main/resources/application.properties
+----------------------------------------
+spring.application.name=auth-service
+server.port=${SERVER_PORT:8080}
+
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.default_schema=auth_service
+
+jwt.secret=${JWT_SECRET:U8mG8YkqzUjH9iMz4HfA3V6pEJxQ1r4z7NnYtX9aQ2M=}
+jwt.expiration=${JWT_EXPIRATION_MS:3600000}
+
+# === OAuth2 Google Registration ===
+spring.security.oauth2.client.registration.google.client-id=${GOOGLE_CLIENT_ID:__fill__}
+spring.security.oauth2.client.registration.google.client-secret=${GOOGLE_CLIENT_SECRET:__fill__}
+spring.security.oauth2.client.registration.google.redirect-uri={baseUrl}/login/oauth2/code/{registrationId}
+spring.security.oauth2.client.registration.google.scope=openid,profile,email
+
+# === OAuth2 Google Provider Endpoints ===
+spring.security.oauth2.client.provider.google.authorization-uri=https://accounts.google.com/o/oauth2/auth
+spring.security.oauth2.client.provider.google.token-uri=https://oauth2.googleapis.com/token
+spring.security.oauth2.client.provider.google.user-info-uri=https://www.googleapis.com/oauth2/v3/userinfo
+spring.security.oauth2.client.provider.google.user-name-attribute=sub
+
+management.endpoints.web.exposure.include=health,info
+
+
+### File: auth-service/src/test/java/tassproject/authservice/AuthServiceApplicationTests.java
+----------------------------------------
+package tassproject.authservice;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class AuthServiceApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
 }
 
 
@@ -1576,7 +2335,9 @@ class NotificationServiceApplicationTests {
         <module>dispensation-service</module>
         <module>inventory-service</module>
         <module>notification-service</module>
+        <module>auth-service</module>
     </modules>
+
 
 </project>
 
