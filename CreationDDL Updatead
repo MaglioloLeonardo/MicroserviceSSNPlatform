@@ -7,11 +7,12 @@ CREATE SCHEMA IF NOT EXISTS auth_service;
 
 -- 2) Creazione della tabella users
 CREATE TABLE auth_service.users (
-                                    id BIGSERIAL PRIMARY KEY,
-                                    username VARCHAR(255) NOT NULL UNIQUE,
-                                    password VARCHAR(255) NOT NULL,
-                                    role VARCHAR(50) NOT NULL,
-                                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id BIGSERIAL PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    session_version INT NOT NULL DEFAULT 0       -- ← colonna aggiunta per la revoca delle sessioni
 );
 
 -- 3) Index aggiuntivo su username (anche se UNIQUE già crea un index, lo specifichiamo per chiarezza)
@@ -128,7 +129,7 @@ CREATE TABLE IF NOT EXISTS prescription_service.prescription_items (
         REFERENCES pharma_service.drugs(id),
     active_ingredient_id UUID NOT NULL
         REFERENCES pharma_service.active_ingredients(id),
-    active_ingredient VARCHAR(255) NOT NULL,          -- aggiunta per Hibernate
+    active_ingredient VARCHAR(255) NOT NULL,
     dosage VARCHAR(100) NOT NULL,
     quantity INT NOT NULL CHECK (quantity > 0)
 );

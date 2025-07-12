@@ -7,6 +7,7 @@ import io.jsonwebtoken.io.DecodingException;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
 import javax.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -31,26 +32,27 @@ public class JwtUtil {
         } catch (IllegalArgumentException | DecodingException ex) {
             keyBytes = secretValue.getBytes(StandardCharsets.UTF_8);
         }
-
         if (keyBytes.length < 32) {
             throw new IllegalStateException(
                     "Il JWT_SECRET configurato è troppo corto (" +
                             (keyBytes.length * 8) + " bit). " +
-                            "Deve essere almeno 256 bit. Genera con: openssl rand -base64 32"
+                            "Deve essere almeno 256 bit."
             );
         }
-
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
+    /* ⇢ MODIFICATO: claim 'ver' ------------------------------------------------ */
     public String generateToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getUsername())
+                .claim("ver", user.getSessionVersion())          // <—
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
+    /* ------------------------------------------------------------------------- */
 
     public String getUsernameFromToken(String token) {
         return Jwts.parser()
@@ -59,14 +61,5 @@ public class JwtUtil {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
-    }
-
-    public boolean validateToken(String token) {
-        try {
-            Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
-            return true;
-        } catch (Exception ex) {
-            return false;
-        }
     }
 }
