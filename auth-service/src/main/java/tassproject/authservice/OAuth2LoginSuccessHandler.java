@@ -27,47 +27,50 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                                         HttpServletResponse response,
                                         Authentication authentication)
             throws IOException, ServletException {
-        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
 
+        // 1) Estrai l’OAuth2User e la sua email
+        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
         String email = oAuth2User.getAttribute("email");
+
+        // 2) Se Google non ci fornisce l’email, rimandiamo 401 con JSON di errore
         if (email == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             new ObjectMapper().writeValue(response.getWriter(),
-                    Map.of("error","Unauthorized","message","No email provided by Google"));
+                    Map.of(
+                            "error", "Unauthorized",
+                            "message", "No email provided by Google"
+                    )
+            );
             return;
         }
 
-        // trova o crea un User locale
+        // 3) Trova o crea l’utente locale
         User user = userRepository.findByUsername(email.toLowerCase())
                 .orElseGet(() -> {
                     User u = new User(
                             email.toLowerCase(),
-                            "",                  // password vuota (non useremo il form-login)
-                            Role.PATIENT         // default role
+                            "",            // password vuota perché non useremo il form-login
+                            Role.PATIENT   // ruolo di default
                     );
                     return userRepository.save(u);
                 });
 
-        // genera il JWT
+        // 4) Genera il JWT
         String jwt = jwtUtil.generateToken(user);
 
-        // 🚩 Imposta il JWT in un cookie HttpOnly (opzionale, ma consigliato)
+        // 5) Imposta il JWT in un cookie HttpOnly
         Cookie jwtCookie = new Cookie("access_token", jwt);
         jwtCookie.setHttpOnly(true);
         jwtCookie.setSecure(request.isSecure());
         jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(60 * 60); // 1 ora, oppure configurable
-
+        jwtCookie.setMaxAge(60 * 60); // 1 ora
+        // Se servisse cross-site:
+        // jwtCookie.setSecure(true);
+        // jwtCookie.setSameSite("None");
         response.addCookie(jwtCookie);
 
-        // rispondi JSON (se vuoi che il frontend legga il token e lo gestisca)
-        response.setContentType("application/json");
-        new ObjectMapper().writeValue(response.getWriter(),
-                Map.of(
-                        "tokenType","Bearer",
-                        "accessToken", jwt
-                )
-        );
+        // 6) Redirect diretto al frontend per la selezione del ruolo
+        response.sendRedirect("http://localhost:3000/seleziona-ruolo");
     }
 }

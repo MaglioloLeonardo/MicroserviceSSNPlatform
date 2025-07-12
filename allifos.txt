@@ -73,6 +73,40 @@ public class ApiGatewayApplication {
 }
 
 
+### File: api-gateway/src/main/java/tassproject/apigateway/GlobalCorsConfig.java
+----------------------------------------
+package tassproject.apigateway;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsWebFilter;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
+
+@Configuration
+public class GlobalCorsConfig {
+
+    @Bean
+    public CorsWebFilter corsWebFilter() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowedOrigins(List.of(
+                "http://localhost:3000",
+                "http://localhost:5173"
+        ));
+        cfg.setAllowedMethods(List.of("*"));
+        cfg.setAllowedHeaders(List.of("*"));
+        cfg.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cfg);
+
+        return new CorsWebFilter(source);
+    }
+}
+
+
 ### File: api-gateway/src/main/java/tassproject/apigateway/JwtCookieAuthWebFilter.java
 ----------------------------------------
 package tassproject.apigateway;
@@ -133,13 +167,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -148,33 +183,34 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
-                .csrf(csrf -> csrf.disable())
-                .authorizeExchange(exchanges -> exchanges
-
-                        // 1) Permetti il login Google e il callback OAuth2
-                        .pathMatchers("/oauth2/authorization/google", "/login/oauth2/**").permitAll()
-
-                        // 2) Permetti l’accesso alle API REST non protette
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .authorizeExchange(ex -> ex
+                        .pathMatchers("/oauth2/**", "/login/**").permitAll()
                         .pathMatchers("/api/v1/auth/**", "/actuator/**").permitAll()
-
-                        // 3) Tutte le altre rotte richiedono un JWT valido
                         .anyExchange().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt()
-                );
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt());
 
         return http.build();
     }
 
+    /**
+     * Usa la chiave fornita tramite property / env var “jwt.secret”.
+     * Se la stringa è Base‑64 la decodifichiamo, altrimenti la
+     * trattiamo come testo puro UTF‑8.
+     */
     @Bean
     public ReactiveJwtDecoder jwtDecoder(
             @Value("${jwt.secret:my_jwt_secret}") String secret) {
 
-        SecretKey key = new SecretKeySpec(
-                secret.getBytes(StandardCharsets.UTF_8),
-                "HmacSHA256"
-        );
+        byte[] keyBytes;
+        try {
+            keyBytes = Base64.getDecoder().decode(secret);
+        } catch (IllegalArgumentException ex) {
+            keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        }
+
+        SecretKey key = new SecretKeySpec(keyBytes, "HmacSHA256");
         return NimbusReactiveJwtDecoder.withSecretKey(key).build();
     }
 }
@@ -184,7 +220,7 @@ public class SecurityConfig {
 ----------------------------------------
 spring.application.name=api-gateway
 server.port=${SERVER_PORT:8080}
-
+logging.level.org.springframework.security=INFO
 # (NO JDBC: questo servizio non usa database direttamente)
 # (NO JPA)
 # (NO HikariCP)
@@ -194,6 +230,7 @@ management.endpoints.web.exposure.include=health,info
 
 # === JWT segreto condiviso con auth-service ===
 jwt.secret=${JWT_SECRET:my_jwt_secret}
+
 
 
 ### File: api-gateway/src/main/resources/application.yml
@@ -210,45 +247,55 @@ spring:
       globalcors:
         corsConfigurations:
           "[/**]":
-            allowedOrigins: "http://localhost:3000"  # non "*"
+            allowedOrigins: "http://localhost:3000,http://localhost:5173"
             allowedMethods: "*"
             allowedHeaders: "*"
             allowCredentials: true
 
       routes:
 
-        # OAuth2 Login (Google) → auth-service su container auth-service:8080
-        - id: oauth2-login
-          uri: http://auth-service:8080
+        # ─────────────  OAUTH2 GOOGLE  ─────────────
+        # (1) richiesta iniziale /oauth2/authorization/google
+        - id: oauth2-authorization
+          uri: http://auth-service:8080      # dentro la rete Docker
           predicates:
             - Path=/oauth2/authorization/google
-            - Path=/login/oauth2/**
+          filters:
+            - PreserveHostHeader             # host esterno rimane “localhost:8080”
 
-        # Auth-service (REST) → stesso servizio
+        # (2) callback /login/oauth2/**
+        - id: oauth2-callback
+          uri: http://auth-service:8080
+          predicates:
+            - Path=/login/oauth2/**
+          filters:
+            - PreserveHostHeader
+
+        # ─────────────  AUTH REST  ─────────────
         - id: auth-service
           uri: http://auth-service:8080
           predicates:
             - Path=/api/v1/auth/**
 
-        # Prescription
+        # ─────────────  PRESCRIPTION  ─────────────
         - id: prescription-service
           uri: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
           predicates:
             - Path=/api/v1/prescriptions/**,/api/v1/patients/{patientId}/prescriptions/**
 
-        # Dispensation
+        # ─────────────  DISPENSATION  ─────────────
         - id: dispensation-service
           uri: ${DISPENSATION_SERVICE_URL:http://dispensation-service:8080}
           predicates:
             - Path=/api/v1/dispensations/**,/api/v1/prescriptions/*/dispensations/**
 
-        # Inventory
+        # ─────────────  INVENTORY  ─────────────
         - id: inventory-service
           uri: ${INVENTORY_SERVICE_URL:http://inventory-service:8080}
           predicates:
             - Path=/api/v1/inventory/**
 
-        # Notification
+        # ─────────────  NOTIFICATION  ─────────────
         - id: notification-service
           uri: ${NOTIFICATION_SERVICE_URL:http://notification-service:8080}
           predicates:
@@ -499,6 +546,40 @@ public class AuthServiceApplication {
 }
 
 
+### File: auth-service/src/main/java/tassproject/authservice/GlobalCorsConfig.java
+----------------------------------------
+package tassproject.authservice;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
+
+import java.util.List;
+
+@Configuration
+public class GlobalCorsConfig {
+
+    @Bean
+    public CorsFilter corsFilter() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://localhost:3000"
+        ));
+        cfg.setAllowedMethods(List.of("*"));
+        cfg.setAllowedHeaders(List.of("*"));
+        cfg.setAllowCredentials(true);
+
+        var source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cfg);
+
+        return new CorsFilter(source);
+    }
+}
+
+
 ### File: auth-service/src/main/java/tassproject/authservice/GlobalExceptionHandler.java
 ----------------------------------------
 package tassproject.authservice;
@@ -664,48 +745,51 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                                         HttpServletResponse response,
                                         Authentication authentication)
             throws IOException, ServletException {
-        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
 
+        // 1) Estrai l’OAuth2User e la sua email
+        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
         String email = oAuth2User.getAttribute("email");
+
+        // 2) Se Google non ci fornisce l’email, rimandiamo 401 con JSON di errore
         if (email == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             new ObjectMapper().writeValue(response.getWriter(),
-                    Map.of("error","Unauthorized","message","No email provided by Google"));
+                    Map.of(
+                            "error", "Unauthorized",
+                            "message", "No email provided by Google"
+                    )
+            );
             return;
         }
 
-        // trova o crea un User locale
+        // 3) Trova o crea l’utente locale
         User user = userRepository.findByUsername(email.toLowerCase())
                 .orElseGet(() -> {
                     User u = new User(
                             email.toLowerCase(),
-                            "",                  // password vuota (non useremo il form-login)
-                            Role.PATIENT         // default role
+                            "",            // password vuota perché non useremo il form-login
+                            Role.PATIENT   // ruolo di default
                     );
                     return userRepository.save(u);
                 });
 
-        // genera il JWT
+        // 4) Genera il JWT
         String jwt = jwtUtil.generateToken(user);
 
-        // 🚩 Imposta il JWT in un cookie HttpOnly (opzionale, ma consigliato)
+        // 5) Imposta il JWT in un cookie HttpOnly
         Cookie jwtCookie = new Cookie("access_token", jwt);
         jwtCookie.setHttpOnly(true);
         jwtCookie.setSecure(request.isSecure());
         jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(60 * 60); // 1 ora, oppure configurable
-
+        jwtCookie.setMaxAge(60 * 60); // 1 ora
+        // Se servisse cross-site:
+        // jwtCookie.setSecure(true);
+        // jwtCookie.setSameSite("None");
         response.addCookie(jwtCookie);
 
-        // rispondi JSON (se vuoi che il frontend legga il token e lo gestisca)
-        response.setContentType("application/json");
-        new ObjectMapper().writeValue(response.getWriter(),
-                Map.of(
-                        "tokenType","Bearer",
-                        "accessToken", jwt
-                )
-        );
+        // 6) Redirect diretto al frontend per la selezione del ruolo
+        response.sendRedirect("http://localhost:3000/seleziona-ruolo");
     }
 }
 
@@ -1088,33 +1172,42 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 ### File: auth-service/src/main/resources/application.properties
 ----------------------------------------
+# ????????? Logging Spring Security ?????????
+logging.level.org.springframework.security=INFO
+
+# ????????? Spring Boot ?????????
 spring.application.name=auth-service
 server.port=${SERVER_PORT:8080}
 
+# ????????? Datasource ?????????
 spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
 spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
 spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
+# ????????? JPA / Hibernate ?????????
 spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 spring.jpa.properties.hibernate.default_schema=auth_service
 
+# ????????? JWT Settings ?????????
 jwt.secret=${JWT_SECRET:U8mG8YkqzUjH9iMz4HfA3V6pEJxQ1r4z7NnYtX9aQ2M=}
 jwt.expiration=${JWT_EXPIRATION_MS:3600000}
 
-# === OAuth2 Google Registration ===
+# ????????? OAuth2 Google Registration ?????????
 spring.security.oauth2.client.registration.google.client-id=1052773766792-14leidinpkl862i67o4k62ck8iqtqjrn.apps.googleusercontent.com
 spring.security.oauth2.client.registration.google.client-secret=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
 spring.security.oauth2.client.registration.google.redirect-uri={baseUrl}/login/oauth2/code/{registrationId}
 spring.security.oauth2.client.registration.google.scope=openid,profile,email
 
-# === OAuth2 Google Provider Endpoints ===
+# ????????? OAuth2 Google Provider Endpoints ?????????
 spring.security.oauth2.client.provider.google.authorization-uri=https://accounts.google.com/o/oauth2/auth
 spring.security.oauth2.client.provider.google.token-uri=https://oauth2.googleapis.com/token
 spring.security.oauth2.client.provider.google.user-info-uri=https://www.googleapis.com/oauth2/v3/userinfo
 spring.security.oauth2.client.provider.google.user-name-attribute=sub
 
+# ????????? Forward Headers & Actuator ?????????
+server.forward-headers-strategy=native
 management.endpoints.web.exposure.include=health,info
 
 
@@ -1126,7 +1219,7 @@ spring:
       globalcors:
         corsConfigurations:
           "[/**]":
-            allowedOrigins: "http://localhost:3000"
+            allowedOrigins: "http://localhost:5173,http://localhost:3000"
             allowedMethods: "*"
             allowedHeaders: "*"
 
