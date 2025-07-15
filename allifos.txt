@@ -939,7 +939,7 @@ public class OAuth2SecurityConfig {
     private final RestAuthenticationEntryPoint restEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
 
-    @Bean
+    /*@Bean
     @Order(1)
     public SecurityFilterChain oauth2LoginFilterChain(HttpSecurity http) throws Exception {
         http
@@ -963,7 +963,7 @@ public class OAuth2SecurityConfig {
                 .oauth2Login(oauth2 -> oauth2.successHandler(successHandler))
                 .cors(Customizer.withDefaults());
         return http.build();
-    }
+    }*/
 }
 
 
@@ -1002,7 +1002,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class ResourceServerConfig {
 
     private final JwtDecoder jwtDecoder;
-
+    /*
     @Bean
     @Order(2)
     public SecurityFilterChain resourceServerFilterChain(HttpSecurity http) throws Exception {
@@ -1016,7 +1016,7 @@ public class ResourceServerConfig {
                         .jwt(jwt -> jwt.decoder(jwtDecoder))
                 );
         return http.build();
-    }
+    }*/
 }
 
 
@@ -1138,13 +1138,6 @@ import tassproject.authservice.repository.UserRepository;
 
 import javax.crypto.SecretKey;
 
-/**
- * Configurazione di sicurezza per l’auth‑service.
- * ‑ JWT firmati e verificati con la stessa chiave HS‑256
- * ‑ Login classico + OAuth2 Google
- * ‑ Resource‑server stateless
- * ‑ CORS abilitato per http://localhost:3000 e header Authorization
- */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -1217,9 +1210,10 @@ public class SecurityConfig implements WebMvcConfigurer {
                 .allowCredentials(true);
     }
 
+    // **QUI LA VERSIONE CORRETTA**
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
-                                           AuthenticationManager authManager) throws Exception {
+                                           JwtDecoder jwtDecoder) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -1229,13 +1223,12 @@ public class SecurityConfig implements WebMvcConfigurer {
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/oauth2/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restEntryPoint)
                         .accessDeniedHandler(restAccessDeniedHandler)
                 )
-                .authenticationManager(authManager)
-                .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2LoginSuccessHandler))
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2LoginSuccessHandler));
 
         return http.build();
     }

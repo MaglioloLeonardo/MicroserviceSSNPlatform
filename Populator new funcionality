@@ -1,0 +1,269 @@
+-- ====================================================
+-- 5) Popolamento esteso con dati di esempio
+--    (adattato al nuovo DDL senza la colonna users.role)
+-- ====================================================
+
+/* 5.1) Cittadini (40 in totale) */
+INSERT INTO anagrafica_service.citizens
+(id, cf, nome, cognome, data_nascita, luogo_nascita, citta_residenza, tipo_utente)
+VALUES
+    /* MEDICI */
+    ('10000000-0000-0000-0000-000000000001','RSSMRA80A01H501U','Mario'   ,'Rossi'    ,'1980-01-01','Milano' ,'Milano' ,'MEDICO'),
+    ('10000000-0000-0000-0000-000000000002','BNCLCU75B05F205X','Lucia'   ,'Bianchi'  ,'1975-05-05','Torino' ,'Torino' ,'MEDICO'),
+    ('10000000-0000-0000-0000-000000000003','VRDGLL85C12D325V','Giulia'  ,'Verdi'    ,'1985-12-12','Roma'   ,'Roma'   ,'MEDICO'),
+    ('10000000-0000-0000-0000-000000000004','LMGBRT90E25L123Z','Roberto' ,'Lombardi' ,'1990-06-25','Bologna','Bologna','MEDICO'),
+    ('10000000-0000-0000-0000-000000000005','FDNNCL82D09Z404D','Nicola'  ,'Federn'   ,'1982-04-09','Napoli' ,'Napoli' ,'MEDICO'),
+    ('10000000-0000-0000-0000-000000000006','RNVPLA83G22E783K','Paolo'   ,'Renova'   ,'1983-07-22','Verona' ,'Verona' ,'MEDICO'),
+    ('10000000-0000-0000-0000-000000000007','SNTCLD79H15A123F','Claudia' ,'Santini'  ,'1979-08-15','Genova' ,'Genova' ,'MEDICO'),
+    ('10000000-0000-0000-0000-000000000008','FRLGNN81L09C852Q','Gianni'  ,'Furlan'   ,'1981-06-09','Trieste','Trieste','MEDICO'),
+    ('10000000-0000-0000-0000-000000000009','GRCMLR77M21B321W','Lara'    ,'Groce'    ,'1977-09-21','Bari'   ,'Bari'   ,'MEDICO'),
+    ('10000000-0000-0000-0000-000000000010','DVCRRT74N30C456A','Carlo'   ,'De Vico'  ,'1974-10-30','Catania','Catania','MEDICO'),
+
+    /* PAZIENTI */
+    ('20000000-0000-0000-0000-000000000001','VRDMRA87B55F205X','Maria'    ,'Verdi'     ,'1987-03-10','Milano' ,'Monza'  ,'PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000002','NRILCU90C12D325V','Luca'     ,'Neri'      ,'1990-12-12','Roma'   ,'Roma'   ,'PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000003','SLAGLU91D45E123Z','Giulia'   ,'Sala'      ,'1991-04-05','Firenze','Firenze','PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000004','PTGLBN95F30G716R','Alberto'  ,'Pitagora'  ,'1995-07-30','Genova' ,'Genova' ,'PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000005','BLCZFM89H19B320K','Zoe'      ,'Bellucci'  ,'1989-02-19','Torino' ,'Torino' ,'PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000006','PRLVND93J23L219P','Valentina','Parisi'    ,'1993-11-23','Napoli' ,'Caserta','PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000007','MLNNCL78K10M123T','Nicola'   ,'Milano'    ,'1978-05-10','Bari'   ,'Bari'   ,'PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000008','DZTRRA88L09N456Q','Sara'     ,'De Zottis' ,'1988-06-09','Venezia','Venezia','PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000009','BRGCTT82M17P123G','Stefano'  ,'Bergamo'   ,'1982-09-17','Bergamo','Bergamo','PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000010','ZGNRMN91N21Q789S','Monica'   ,'Zagnoni'   ,'1991-11-21','Verona' ,'Verona' ,'PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000011','CRSVNC85H10D612L','Vanessa'  ,'Corsini'   ,'1985-08-10','Prato'  ,'Prato'  ,'PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000012','GRNPLA92J02H703P','Paolo'    ,'Grandi'    ,'1992-10-02','Como'   ,'Como'   ,'PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000013','FRNGLC79M11C321B','Giacomo'  ,'Ferrini'   ,'1979-09-11','Ancona' ,'Ancona' ,'PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000014','PRTCHR88A15F837J','Chiara'   ,'Porta'     ,'1988-01-15','Lecce'  ,'Lecce'  ,'PAZIENTE'),
+    ('20000000-0000-0000-0000-000000000015','MSCRNT86B30A912E','Renato'   ,'Misci'     ,'1986-02-28','Aosta'  ,'Aosta'  ,'PAZIENTE'),
+
+    /* FARMACISTI */
+    ('30000000-0000-0000-0000-000000000001','DNTRRA84P04R219J','Adriana'  ,'Dentieri' ,'1984-08-04','Milano' ,'Milano' ,'FARMACISTA'),
+    ('30000000-0000-0000-0000-000000000002','BLUANN88D04L219P','Anna'     ,'Blu'       ,'1988-06-04','Roma'   ,'Roma'   ,'FARMACISTA'),
+    ('30000000-0000-0000-0000-000000000003','MRCNCL76F12F205U','Nicola'   ,'Marconi'   ,'1976-05-12','Torino' ,'Torino' ,'FARMACISTA'),
+    ('30000000-0000-0000-0000-000000000004','FRSZPG81H19Z404D','Giorgio'  ,'Forsone'   ,'1981-02-19','Genova' ,'Genova' ,'FARMACISTA'),
+    ('30000000-0000-0000-0000-000000000005','PLMLNN90J23M123T','Martina'  ,'Palma'     ,'1990-11-23','Bologna','Bologna','FARMACISTA'),
+    ('30000000-0000-0000-0000-000000000006','CNTRRR77K10Q123L','Lorenzo'  ,'Cantori'   ,'1977-07-10','Napoli' ,'Napoli' ,'FARMACISTA'),
+    ('30000000-0000-0000-0000-000000000007','VRDNCL79L09N456Q','Chiara'   ,'Verdoni'   ,'1979-06-09','Venezia','Venezia','FARMACISTA'),
+    ('30000000-0000-0000-0000-000000000008','SGRGTT82M17P123G','Matteo'   ,'Sgarbi'    ,'1982-09-17','Bergamo','Bergamo','FARMACISTA'),
+    ('30000000-0000-0000-0000-000000000009','MRNPLL80A01H501W','Paolo'    ,'Morandi'   ,'1980-01-01','Parma'  ,'Parma'  ,'FARMACISTA'),
+    ('30000000-0000-0000-0000-000000000010','DLVSRN78B05F205A','Serena'   ,'Della Vita','1978-02-05','Udine'  ,'Udine'  ,'FARMACISTA'),
+
+    /* ADMIN */
+    ('40000000-0000-0000-0000-000000000001','ADMDOA75E20H501Q','Domenico','Admin'    ,'1975-08-20','Firenze','Firenze','ADMIN'),
+    ('40000000-0000-0000-0000-000000000002','ADMMSR80B12L219Z','Marta'   ,'Admin'    ,'1980-02-12','Roma'   ,'Roma'   ,'ADMIN'),
+    ('40000000-0000-0000-0000-000000000003','ADMGLA79C22E713P','Alessia' ,'Admin'    ,'1979-03-22','Milano' ,'Milano' ,'ADMIN'),
+    ('40000000-0000-0000-0000-000000000004','ADMFRN77D18C612S','Franco'  ,'Admin'    ,'1977-04-18','Napoli' ,'Napoli' ,'ADMIN'),
+    ('40000000-0000-0000-0000-000000000005','ADMCRT82H11A345R','Cristina','Admin'    ,'1982-08-11','Bari'   ,'Bari'   ,'ADMIN')
+;
+
+/* 5.1.1) Ruoli specifici */
+-- medici
+INSERT INTO anagrafica_service.doctors(id, specializzazione)
+SELECT id,
+       (ARRAY['Medicina Generale','Cardiologia','Dermatologia',
+           'Neurologia','Pediatria','Ortopedia','Oncologia'])
+           [(floor(random()*7)+1)::int]
+FROM anagrafica_service.citizens
+WHERE tipo_utente='MEDICO';
+
+-- pazienti
+INSERT INTO anagrafica_service.patients(id, peso, altezza)
+SELECT id,
+       round((55 + random()*45)::numeric,1),
+       round((155 + random()*35)::numeric,1)
+FROM anagrafica_service.citizens
+WHERE tipo_utente='PAZIENTE';
+
+-- farmacisti
+INSERT INTO anagrafica_service.pharmacists(id)
+SELECT id
+FROM anagrafica_service.citizens
+WHERE tipo_utente='FARMACISTA';
+
+-- amministratori SSN
+INSERT INTO anagrafica_service.ssn_admins(id)
+SELECT id
+FROM anagrafica_service.citizens
+WHERE tipo_utente='ADMIN';
+
+/* 5.2) Account applicativi, mapping profilo e ruoli M‑N */
+-- 5.2.1 utenti (uno per ogni citizen)
+INSERT INTO auth_service.users(username, password)
+SELECT
+    lower(regexp_replace(nome,'\s','','g'))
+        ||'.'||
+    lower(regexp_replace(cognome,'\s','','g'))
+        ||'@example.com',
+    '$2a$10$7EqJtq98hPqEX7fNZaFWoOtjflzAwj/vGps/3fUP67mFQo5C9YBi'
+FROM anagrafica_service.citizens
+ORDER BY id;
+
+-- 5.2.2 mappatura 1:1 user ↔ citizen
+INSERT INTO auth_service.user_profiles(user_id, citizen_id)
+SELECT u.id, c.id
+FROM auth_service.users u
+         JOIN anagrafica_service.citizens c
+              ON lower(split_part(u.username,'@',1))
+                  = lower(regexp_replace(c.nome,'\s','','g'))
+                        ||'.'||lower(regexp_replace(c.cognome,'\s','','g'));
+
+-- 5.2.3 ruoli M‑N coerenti con tipo_utente
+INSERT INTO auth_service.user_roles(user_id, role_id)
+SELECT u.id, r.id
+FROM auth_service.users u
+         JOIN anagrafica_service.citizens c
+              ON lower(split_part(u.username,'@',1))
+                  = lower(regexp_replace(c.nome,'\s','','g'))
+                        ||'.'||lower(regexp_replace(c.cognome,'\s','','g'))
+         JOIN auth_service.roles r
+              ON (CASE c.tipo_utente
+                      WHEN 'MEDICO'     THEN 'DOCTOR'
+                      WHEN 'PAZIENTE'   THEN 'PATIENT'
+                      WHEN 'FARMACISTA' THEN 'PHARMACIST'
+                      WHEN 'ADMIN'      THEN 'ADMIN'
+                  END) = r.name;
+
+/* 5.3) Famiglie, principi attivi, farmaci */
+-- 5.3.1 famiglie (10)
+INSERT INTO pharma_service.pharma_families(id, nome, descrizione) VALUES
+                                                                      ('50000000-0000-0000-0000-000000000001','Antibiotici'      ,'Trattamento infezioni batteriche'),
+                                                                      ('50000000-0000-0000-0000-000000000002','Antidolorifici'   ,'Sollievo dal dolore'),
+                                                                      ('50000000-0000-0000-0000-000000000003','Antinfiammatori'  ,'Riduzione infiammazione'),
+                                                                      ('50000000-0000-0000-0000-000000000004','Antipiretici'     ,'Abbassamento febbre'),
+                                                                      ('50000000-0000-0000-0000-000000000005','Antistaminici'    ,'Reazioni allergiche'),
+                                                                      ('50000000-0000-0000-0000-000000000006','Cardiovascolari'  ,'Supporto circolatorio'),
+                                                                      ('50000000-0000-0000-0000-000000000007','Psicofarmaci'     ,'Salute mentale'),
+                                                                      ('50000000-0000-0000-0000-000000000008','Diabetologia'     ,'Controllo glicemia'),
+                                                                      ('50000000-0000-0000-0000-000000000009','Gastroenterologia','Salute gastrointestinale'),
+                                                                      ('50000000-0000-0000-0000-000000000010','Neurologia'       ,'Sistema nervoso');
+
+-- 5.3.2 principi attivi (15)
+INSERT INTO pharma_service.active_ingredients(id, nome, descrizione, famiglia_id) VALUES
+                                                                                      ('51000000-0000-0000-0000-000000000001','Amoxicillina' ,'Antibiotico beta-lattamico'      ,'50000000-0000-0000-0000-000000000001'),
+                                                                                      ('51000000-0000-0000-0000-000000000002','Azitromicina' ,'Macrolide ampio spettro'         ,'50000000-0000-0000-0000-000000000001'),
+                                                                                      ('51000000-0000-0000-0000-000000000003','Diclofenac'   ,'FANS'                             ,'50000000-0000-0000-0000-000000000003'),
+                                                                                      ('51000000-0000-0000-0000-000000000004','Ibuprofene'   ,'FANS'                             ,'50000000-0000-0000-0000-000000000003'),
+                                                                                      ('51000000-0000-0000-0000-000000000005','Paracetamolo' ,'Analgesico/antipiretico'          ,'50000000-0000-0000-0000-000000000004'),
+                                                                                      ('51000000-0000-0000-0000-000000000006','Loratadina'   ,'Antistaminico II gen.'            ,'50000000-0000-0000-0000-000000000005'),
+                                                                                      ('51000000-0000-0000-0000-000000000007','Cetirizina'   ,'Antistaminico I gen.'             ,'50000000-0000-0000-0000-000000000005'),
+                                                                                      ('51000000-0000-0000-0000-000000000008','Metformina'   ,'Ipoglicemizzante orale'           ,'50000000-0000-0000-0000-000000000008'),
+                                                                                      ('51000000-0000-0000-0000-000000000009','Atorvastatina','Statina'                          ,'50000000-0000-0000-0000-000000000006'),
+                                                                                      ('51000000-0000-0000-0000-00000000000A','Sertralina'   ,'SSRI'                             ,'50000000-0000-0000-0000-000000000007'),
+                                                                                      ('51000000-0000-0000-0000-00000000000B','Omeprazolo'   ,'IPP'                              ,'50000000-0000-0000-0000-000000000009'),
+                                                                                      ('51000000-0000-0000-0000-00000000000C','Lorazepam'    ,'Benzodiazepina'                   ,'50000000-0000-0000-0000-000000000007'),
+                                                                                      ('51000000-0000-0000-0000-00000000000D','Metoprololo'  ,'Beta‑bloccante'                   ,'50000000-0000-0000-0000-000000000006'),
+                                                                                      ('51000000-0000-0000-0000-00000000000E','Pantoprazolo' ,'IPP'                              ,'50000000-0000-0000-0000-000000000009'),
+                                                                                      ('51000000-0000-0000-0000-00000000000F','Clopidogrel'  ,'Antiaggregante'                   ,'50000000-0000-0000-0000-000000000006');
+
+-- 5.3.3 farmaci (30)
+INSERT INTO pharma_service.drugs
+(id, nome_commerciale, produttore, modo_somministrazione, prezzo, principio_attivo_id)
+VALUES
+    ('52000000-0000-0000-0000-000000000001','Amoxil'           ,'FarmaCorp'    ,'orale',18.50,'51000000-0000-0000-0000-000000000001'),
+    ('52000000-0000-0000-0000-000000000002','Zithromax'        ,'MacroLabs'    ,'orale',25.00,'51000000-0000-0000-0000-000000000002'),
+    ('52000000-0000-0000-0000-000000000003','Voltaren'         ,'NextPharma'   ,'topica',12.00,'51000000-0000-0000-0000-000000000003'),
+    ('52000000-0000-0000-0000-000000000004','Brufen'           ,'WellnessLab'  ,'orale',11.00,'51000000-0000-0000-0000-000000000004'),
+    ('52000000-0000-0000-0000-000000000005','Tachipirina'      ,'BioHealth'    ,'orale', 6.00,'51000000-0000-0000-0000-000000000005'),
+    ('52000000-0000-0000-0000-000000000006','Claritin'         ,'AllerPharma'  ,'orale',15.00,'51000000-0000-0000-0000-000000000006'),
+    ('52000000-0000-0000-0000-000000000007','Reactine'         ,'HealthPlus'   ,'orale',14.00,'51000000-0000-0000-0000-000000000007'),
+    ('52000000-0000-0000-0000-000000000008','Glucophage'       ,'DiabeCare'    ,'orale', 9.50,'51000000-0000-0000-0000-000000000008'),
+    ('52000000-0000-0000-0000-000000000009','Lipitor'          ,'CardioPharm'  ,'orale',22.00,'51000000-0000-0000-0000-000000000009'),
+    ('52000000-0000-0000-0000-00000000000A','Zoloft'           ,'MindLabs'     ,'orale',30.00,'51000000-0000-0000-0000-00000000000A'),
+    ('52000000-0000-0000-0000-00000000000B','Losec'            ,'GastroLab'    ,'orale',16.00,'51000000-0000-0000-0000-00000000000B'),
+    ('52000000-0000-0000-0000-00000000000C','Ativan'           ,'CalmPharma'   ,'orale',28.00,'51000000-0000-0000-0000-00000000000C'),
+    ('52000000-0000-0000-0000-00000000000D','Lopressor'        ,'HeartCare'    ,'orale',19.00,'51000000-0000-0000-0000-00000000000D'),
+    ('52000000-0000-0000-0000-00000000000E','Protonix'         ,'GastricHealth','orale',18.00,'51000000-0000-0000-0000-00000000000E'),
+    ('52000000-0000-0000-0000-00000000000F','Plavix'           ,'VascuPharm'   ,'orale',24.00,'51000000-0000-0000-0000-00000000000F'),
+    ('52000000-0000-0000-0000-000000000010','Amoxicillina GE'  ,'GenericCo'    ,'orale',12.00,'51000000-0000-0000-0000-000000000001'),
+    ('52000000-0000-0000-0000-000000000011','Ibuprofene GE'    ,'GenericCo'    ,'orale', 8.00,'51000000-0000-0000-0000-000000000004'),
+    ('52000000-0000-0000-0000-000000000012','Paracetamolo GE'  ,'GenericCo'    ,'orale', 4.50,'51000000-0000-0000-0000-000000000005'),
+    ('52000000-0000-0000-0000-000000000013','Claritromicina GE','GenericCo'    ,'orale',20.00,'51000000-0000-0000-0000-000000000002'),
+    ('52000000-0000-0000-0000-000000000014','Diclofenac GE'    ,'GenericCo'    ,'topica', 7.00,'51000000-0000-0000-0000-000000000003'),
+    ('52000000-0000-0000-0000-000000000015','Loratadina GE'    ,'GenericCo'    ,'orale',10.00,'51000000-0000-0000-0000-000000000006'),
+    ('52000000-0000-0000-0000-000000000016','Sertralina GE'    ,'GenericCo'    ,'orale',19.00,'51000000-0000-0000-0000-00000000000A'),
+    ('52000000-0000-0000-0000-000000000017','Omeprazolo GE'    ,'GenericCo'    ,'orale',11.00,'51000000-0000-0000-0000-00000000000B'),
+    ('52000000-0000-0000-0000-000000000018','Lorazepam GE'     ,'GenericCo'    ,'orale',17.00,'51000000-0000-0000-0000-00000000000C'),
+    ('52000000-0000-0000-0000-000000000019','Metoprololo GE'   ,'GenericCo'    ,'orale',13.00,'51000000-0000-0000-0000-00000000000D'),
+    ('52000000-0000-0000-0000-00000000001A','Pantoprazolo GE'  ,'GenericCo'    ,'orale',12.00,'51000000-0000-0000-0000-00000000000E'),
+    ('52000000-0000-0000-0000-00000000001B','Clopidogrel GE'   ,'GenericCo'    ,'orale',18.00,'51000000-0000-0000-0000-00000000000F'),
+    ('52000000-0000-0000-0000-00000000001C','Atorvastatina GE' ,'GenericCo'    ,'orale',14.00,'51000000-0000-0000-0000-000000000009'),
+    ('52000000-0000-0000-0000-00000000001D','Cetirizina GE'    ,'GenericCo'    ,'orale', 9.00,'51000000-0000-0000-0000-000000000007'),
+    ('52000000-0000-0000-0000-00000000001E','Metformina GE'    ,'GenericCo'    ,'orale', 5.00,'51000000-0000-0000-0000-000000000008');
+
+/* 5.4) Prescrizioni (200) + Righe (600) coerenti */
+WITH docs AS (
+    SELECT array_agg(id) AS arr FROM anagrafica_service.doctors
+), pats AS (
+    SELECT array_agg(id) AS arr FROM anagrafica_service.patients
+)
+INSERT INTO prescription_service.prescriptions
+(id, doctor_id, patient_id, issued_at, status, exemption, therapy_duration)
+SELECT
+    md5(gs::text || clock_timestamp()::text)::uuid,
+    (SELECT arr[(floor(random()*cardinality(arr))+1)::int] FROM docs),
+    (SELECT arr[(floor(random()*cardinality(arr))+1)::int] FROM pats),
+    now() - (floor(random()*86400*60)::int || ' seconds')::interval,
+    (ARRAY['OPEN','DISPENSED','COMPLETED','CANCELLED'])[(floor(random()*4)+1)::int],
+    (random()<0.3),
+    (ARRAY['5 giorni','7 giorni','10 giorni','14 giorni','30 giorni'])[(floor(random()*5)+1)::int]
+FROM generate_series(1,200) AS gs;
+
+WITH pres AS (
+    SELECT array_agg(id) AS parr FROM prescription_service.prescriptions
+), drs AS (
+    SELECT id, principio_attivo_id FROM pharma_service.drugs
+), cnt AS (
+    SELECT generate_series(1,600) AS n
+)
+INSERT INTO prescription_service.prescription_items
+(id, prescription_id, drug_id, active_ingredient_id, active_ingredient, dosage, quantity)
+SELECT
+    md5(cnt.n::text || clock_timestamp()::text)::uuid,
+    (SELECT parr[(floor(random()*cardinality(parr))+1)::int] FROM pres),
+    drs.id,
+    drs.principio_attivo_id,
+    ai.nome,
+    (ARRAY['50mg','100mg','200mg','250mg','500mg','750mg','1g'])[(floor(random()*7)+1)::int],
+    (floor(random()*4)+1)::int
+FROM cnt
+         JOIN drs ON true
+         JOIN pharma_service.active_ingredients ai ON ai.id = drs.principio_attivo_id
+ORDER BY cnt.n
+LIMIT 600;
+
+/* 5.5) Dispensazioni casuali (500) */
+WITH pres AS (
+    SELECT array_agg(id) AS parr FROM prescription_service.prescriptions
+), phs AS (
+    SELECT array_agg(id) AS harr FROM anagrafica_service.pharmacists
+)
+INSERT INTO dispensation_service.dispensations
+(id, prescription_id, dispensed_at, dispensed_by, status)
+SELECT
+    md5(gs::text || clock_timestamp()::text)::uuid,
+    (SELECT parr[(floor(random()*cardinality(parr))+1)::int] FROM pres),
+    now() - (floor(random()*86400*30)::int || ' seconds')::interval,
+    (SELECT harr[(floor(random()*cardinality(harr))+1)::int] FROM phs),
+    (ARRAY['DONE','FAILED'])[(floor(random()*2)+1)::int]
+FROM generate_series(1,500) AS gs;
+
+/* 5.6) Inventario (200 record, 1..10 per farmaco) */
+WITH drs AS (
+    SELECT id FROM pharma_service.drugs
+), cnt AS (
+    SELECT generate_series(1,200) AS n
+)
+INSERT INTO inventory_service.inventory_items
+(id, drug_id, available_quantity, last_updated)
+SELECT
+    md5(cnt.n::text || drs.id::text)::uuid,
+    drs.id,
+    (floor(random()*500))::int,
+    now() - (floor(random()*86400*60)::int || ' seconds')::interval
+FROM cnt
+         JOIN drs
+              ON drs.id = (SELECT id FROM pharma_service.drugs ORDER BY random() LIMIT 1);
+
+-- ====================================================
+-- Fine popolamento esteso
+-- ====================================================

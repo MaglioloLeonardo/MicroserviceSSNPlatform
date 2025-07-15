@@ -1,0 +1,209 @@
+-- ====================================================
+-- DDL UNIFICATO (versione estesa con M–N ruoli e mapping 1:1)
+-- Copia‑incolla eseguibile così com’è.
+-- ====================================================
+
+/*
+  0) NOTE DI COMPATIBILITÀ
+     - Rimosso il legacy COLUMN users.role.
+     - Nuovi ruoli in auth_service.roles + auth_service.user_roles (M–N).
+     - Mapping 1:1 account ↔ anagrafica in auth_service.user_profiles.
+*/
+
+-- 1) CREAZIONE SCHEMI
+CREATE SCHEMA IF NOT EXISTS auth_service;
+CREATE SCHEMA IF NOT EXISTS anagrafica_service;
+CREATE SCHEMA IF NOT EXISTS pharma_service;
+CREATE SCHEMA IF NOT EXISTS prescription_service;
+CREATE SCHEMA IF NOT EXISTS dispensation_service;
+CREATE SCHEMA IF NOT EXISTS inventory_service;
+
+
+-- 2) ANAGRAFICA_SERVICE
+CREATE TABLE IF NOT EXISTS anagrafica_service.citizens (
+    id               UUID        PRIMARY KEY,
+    cf               VARCHAR(16) UNIQUE NOT NULL,
+    nome             VARCHAR(100) NOT NULL,
+    cognome          VARCHAR(100) NOT NULL,
+    data_nascita     DATE        NOT NULL,
+    luogo_nascita    VARCHAR(100),
+    citta_residenza  VARCHAR(100),
+    tipo_utente      VARCHAR(16) NOT NULL
+        CHECK (tipo_utente IN ('PAZIENTE','MEDICO','FARMACISTA','ADMIN'))
+);
+
+CREATE TABLE IF NOT EXISTS anagrafica_service.patients (
+    id      UUID        PRIMARY KEY
+                REFERENCES anagrafica_service.citizens(id) ON DELETE CASCADE,
+    peso    DECIMAL(5,2),
+    altezza DECIMAL(5,2)
+);
+
+CREATE TABLE IF NOT EXISTS anagrafica_service.doctors (
+    id               UUID        PRIMARY KEY
+                        REFERENCES anagrafica_service.citizens(id) ON DELETE CASCADE,
+    specializzazione VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS anagrafica_service.pharmacists (
+    id UUID PRIMARY KEY
+          REFERENCES anagrafica_service.citizens(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS anagrafica_service.ssn_admins (
+    id UUID PRIMARY KEY
+          REFERENCES anagrafica_service.citizens(id) ON DELETE CASCADE
+);
+
+
+-- 3) AUTH_SERVICE
+-- 3.1 utenti
+CREATE TABLE IF NOT EXISTS auth_service.users (
+    id              BIGSERIAL    PRIMARY KEY,
+    username        VARCHAR(255) NOT NULL UNIQUE,
+    password        VARCHAR(255) NOT NULL,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    session_version INT          NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username
+    ON auth_service.users(username);
+
+-- 3.2 lookup ruoli
+CREATE TABLE IF NOT EXISTS auth_service.roles (
+    id   SERIAL       PRIMARY KEY,
+    name VARCHAR(50)  NOT NULL UNIQUE
+);
+INSERT INTO auth_service.roles(name)
+VALUES
+    ('PATIENT'),('DOCTOR'),('PHARMACIST'),('ADMIN')
+ON CONFLICT(name) DO NOTHING;
+
+-- 3.3 relazione M–N user ↔ roles
+CREATE TABLE IF NOT EXISTS auth_service.user_roles (
+    user_id BIGINT NOT NULL
+        REFERENCES auth_service.users(id)   ON DELETE CASCADE,
+    role_id INT    NOT NULL
+        REFERENCES auth_service.roles(id)   ON DELETE RESTRICT,
+    PRIMARY KEY(user_id, role_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user
+    ON auth_service.user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role
+    ON auth_service.user_roles(role_id);
+
+-- 3.4 mapping account ↔ anagrafica (1:1)
+CREATE TABLE IF NOT EXISTS auth_service.user_profiles (
+    user_id    BIGINT NOT NULL
+        REFERENCES auth_service.users(id)           ON DELETE CASCADE,
+    citizen_id UUID   NOT NULL
+        REFERENCES anagrafica_service.citizens(id) ON DELETE CASCADE,
+    PRIMARY KEY(user_id, citizen_id),
+    UNIQUE(user_id),
+    UNIQUE(citizen_id)
+);
+
+
+-- 4) PHARMA_SERVICE
+CREATE TABLE IF NOT EXISTS pharma_service.pharma_families (
+    id          UUID PRIMARY KEY,
+    nome        VARCHAR(255) NOT NULL,
+    descrizione TEXT
+);
+
+CREATE TABLE IF NOT EXISTS pharma_service.active_ingredients (
+    id          UUID PRIMARY KEY,
+    nome        VARCHAR(255) NOT NULL,
+    descrizione TEXT,
+    famiglia_id UUID
+        REFERENCES pharma_service.pharma_families(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS pharma_service.drugs (
+    id                   UUID PRIMARY KEY,
+    nome_commerciale     VARCHAR(255) NOT NULL,
+    produttore           VARCHAR(255),
+    modo_somministrazione VARCHAR(255),
+    prezzo               DECIMAL(10,2) NOT NULL,
+    principio_attivo_id  UUID
+        REFERENCES pharma_service.active_ingredients(id) ON DELETE RESTRICT
+);
+
+
+-- 5) PRESCRIPTION_SERVICE
+CREATE TABLE IF NOT EXISTS prescription_service.prescriptions (
+    id               UUID        PRIMARY KEY,
+    doctor_id        UUID        NOT NULL
+        REFERENCES anagrafica_service.doctors(id)  ON DELETE RESTRICT,
+    patient_id       UUID        NOT NULL
+        REFERENCES anagrafica_service.patients(id) ON DELETE RESTRICT,
+    issued_at        TIMESTAMPTZ NOT NULL,
+    status           VARCHAR(16) NOT NULL
+        CHECK (status IN ('OPEN','DISPENSED','COMPLETED','CANCELLED')),
+    exemption        BOOLEAN     NOT NULL,
+    therapy_duration VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS prescription_service.prescription_items (
+    id                   UUID   PRIMARY KEY,
+    prescription_id      UUID   NOT NULL
+        REFERENCES prescription_service.prescriptions(id) ON DELETE CASCADE,
+    drug_id              UUID   NOT NULL
+        REFERENCES pharma_service.drugs(id)               ON DELETE RESTRICT,
+    active_ingredient_id UUID   NOT NULL
+        REFERENCES pharma_service.active_ingredients(id)  ON DELETE RESTRICT,
+    active_ingredient    VARCHAR(255) NOT NULL,
+    dosage               VARCHAR(100) NOT NULL,
+    quantity             INT          NOT NULL CHECK (quantity > 0)
+);
+
+
+-- 6) DISPENSATION_SERVICE
+CREATE TABLE IF NOT EXISTS dispensation_service.dispensations (
+    id              UUID        PRIMARY KEY,
+    prescription_id UUID        NOT NULL
+        REFERENCES prescription_service.prescriptions(id) ON DELETE RESTRICT,
+    dispensed_at    TIMESTAMPTZ NOT NULL,
+    dispensed_by    UUID        NOT NULL
+        REFERENCES anagrafica_service.pharmacists(id)     ON DELETE RESTRICT,
+    status          VARCHAR(8)  NOT NULL
+        CHECK (status IN ('DONE','FAILED'))
+);
+
+
+-- 7) INVENTORY_SERVICE
+CREATE TABLE IF NOT EXISTS inventory_service.inventory_items (
+    id                 UUID PRIMARY KEY,
+    drug_id            UUID NOT NULL
+        REFERENCES pharma_service.drugs(id) ON DELETE RESTRICT,
+    available_quantity INT  NOT NULL CHECK (available_quantity >= 0),
+    last_updated       TIMESTAMPTZ NOT NULL
+);
+
+
+-- 8) INDICI SECONDARI
+-- prescriptions
+CREATE INDEX IF NOT EXISTS idx_ps_doctor
+    ON prescription_service.prescriptions(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_ps_patient
+    ON prescription_service.prescriptions(patient_id);
+-- prescription_items
+CREATE INDEX IF NOT EXISTS idx_pi_drug
+    ON prescription_service.prescription_items(drug_id);
+CREATE INDEX IF NOT EXISTS idx_pi_active_ingredient
+    ON prescription_service.prescription_items(active_ingredient_id);
+-- dispensations
+CREATE INDEX IF NOT EXISTS idx_ds_prescription
+    ON dispensation_service.dispensations(prescription_id);
+CREATE INDEX IF NOT EXISTS idx_ds_pharmacist
+    ON dispensation_service.dispensations(dispensed_by);
+-- inventory_items
+CREATE INDEX IF NOT EXISTS idx_is_drug
+    ON inventory_service.inventory_items(drug_id);
+
+
+-- 9) PRIVILEGI
+GRANT USAGE ON SCHEMA auth_service TO myuser;
+GRANT SELECT, INSERT, UPDATE, DELETE
+    ON ALL TABLES IN SCHEMA auth_service TO myuser;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth_service
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO myuser;
