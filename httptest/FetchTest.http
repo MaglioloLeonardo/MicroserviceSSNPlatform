@@ -1,0 +1,195 @@
+@hostname = localhost
+@gatewayPort = 8080
+
+@doctorId       = 10000000-0000-0000-0000-000000000001
+@patientId      = 20000000-0000-0000-0000-000000000001
+@pharmacistId   = 30000000-0000-0000-0000-000000000001
+
+@doctorToken      = <INSERT_DOCTOR_JWT_HERE>
+@patientToken     = <INSERT_PATIENT_JWT_HERE>
+@pharmacistToken  = <INSERT_PHARMACIST_JWT_HERE>
+@adminToken       = <INSERT_ADMIN_JWT_HERE>
+
+### ─────────── Gateway Health ───────────
+GET http://{{hostname}}:{{gatewayPort}}/actuator/health
+Accept: application/json
+
+###
+
+### ─────── Create Prescription (Doctor) ───────
+POST http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions
+Authorization: Bearer {{doctorToken}}
+Content-Type: application/json
+
+{
+  "doctorId":        "{{doctorId}}",
+  "patientId":       "{{patientId}}",
+  "therapyDuration": "7 giorni",
+  "exemption":       false,
+  "items": [
+    {
+      "drugId":             "52000000-0000-0000-0000-000000000005",
+      "activeIngredientId": "51000000-0000-0000-0000-000000000005",
+      "activeIngredient":   "Paracetamolo",
+      "dosage":             "500mg",
+      "quantity":           2
+    }
+  ]
+}
+> {%
+    if (response.status === 201) {
+        client.global.set("prescId", response.body.id);
+        console.log("⚡️ prescId =", response.body.id);
+    }
+%}
+
+###
+
+### ───── Retrieve Prescription (Patient) ─────
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions/{{prescId}}
+Authorization: Bearer {{patientToken}}
+Accept: application/json
+
+###
+
+### ───── Update Prescription Status (Doctor) ─────
+PUT http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions/{{prescId}}/status
+Authorization: Bearer {{doctorToken}}
+Content-Type: application/json
+
+{
+  "newStatus": "DISPENSED"
+}
+
+###
+
+### ─── List Active Prescriptions by Patient ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/patients/{{patientId}}/prescriptions/active
+Authorization: Bearer {{patientToken}}
+Accept: application/json
+
+###
+
+### ─── List Patients of Doctor ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/doctors/{{doctorId}}/patients
+Authorization: Bearer {{doctorToken}}
+Accept: application/json
+
+###
+
+### ─── List Doctors of Patient ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/patients/{{patientId}}/doctors
+Authorization: Bearer {{patientToken}}
+Accept: application/json
+
+###
+
+### ─── Create Dispensation (Pharmacist) ───
+POST http://{{hostname}}:{{gatewayPort}}/api/v1/dispensations
+Authorization: Bearer {{pharmacistToken}}
+Content-Type: application/json
+
+{
+  "prescriptionId": "{{prescId}}",
+  "dispensedBy":    "{{pharmacistId}}"
+}
+> {%
+    if (response.status === 201) {
+        client.global.set("dispId", response.body.id);
+        console.log("⚡️ dispId =", response.body.id);
+    }
+%}
+
+###
+
+### ─── List Dispensations by Prescription ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/prescriptions/{{prescId}}/dispensations
+Authorization: Bearer {{patientToken}}
+Accept: application/json
+
+###
+
+### ─── List Dispensations by Pharmacist ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/pharmacists/{{pharmacistId}}/dispensations
+Authorization: Bearer {{pharmacistToken}}
+Accept: application/json
+
+###
+
+### ─── List Patients Served by Pharmacist ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/pharmacists/{{pharmacistId}}/patients
+Authorization: Bearer {{pharmacistToken}}
+Accept: application/json
+
+###
+
+### ─── List Pharmacists of Patient ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/patients/{{patientId}}/pharmacists
+Authorization: Bearer {{patientToken}}
+Accept: application/json
+
+###
+
+### ─── List Prescriptions by Doctor ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/doctors/{{doctorId}}/prescriptions
+Authorization: Bearer {{doctorToken}}
+Accept: application/json
+
+###
+
+### ─── List Drugs by Patient ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/patients/{{patientId}}/drugs
+Authorization: Bearer {{patientToken}}
+Accept: application/json
+
+###
+
+### ─── Get Patient Info (Self) ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/patients/{{patientId}}
+Authorization: Bearer {{patientToken}}
+Accept: application/json
+
+###
+
+### ─── Get Doctor Info (Own Patient) ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/doctors/{{doctorId}}
+Authorization: Bearer {{patientToken}}
+Accept: application/json
+
+###
+
+### ─── Attempt Forbidden: Patient Accessing Other Patient ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/patients/99999999-0000-0000-0000-000000000099
+Authorization: Bearer {{patientToken}}
+Accept: application/json
+> {%
+    client.test("Patient cannot access other patient", response.status === 403);
+%}
+
+###
+
+
+
+
+### ─── 1) Login & salva token ───
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "magliololeonardo@hotmail.it",
+  "password": "Bonin1997!?"
+}
+
+
+### ─── Recupera i ruoli dell’utente ───
+GET http://localhost:8080/api/v1/users/magliololeonardo@hotmail.it/roles
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtYWdsaW9sb2xlb25hcmRvQGhvdG1haWwuaXQiLCJ2ZXIiOjAsImlhdCI6MTc1MjM3OTg1OSwiZXhwIjoxNzUyMzgzNDU5fQ.JcUn79vY317RDg-5ovt9VmGlSTVgIvo5srvZGREElJg
+Accept: application/json
+
+### ─── Unauthorized Without Token ───
+GET http://{{hostname}}:{{gatewayPort}}/api/v1/doctors/{{doctorId}}/patients
+Accept: application/json
+> {%
+    client.test("Unauthorized returns 401 or 403", response.status === 401 || response.status === 403);
+%}

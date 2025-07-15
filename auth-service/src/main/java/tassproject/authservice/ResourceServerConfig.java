@@ -16,7 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class ResourceServerConfig {
 
     private final JwtDecoder jwtDecoder;
-
+    /*
     @Bean
     @Order(2)
     public SecurityFilterChain resourceServerFilterChain(HttpSecurity http) throws Exception {
@@ -30,5 +30,5 @@ public class ResourceServerConfig {
                         .jwt(jwt -> jwt.decoder(jwtDecoder))
                 );
         return http.build();
-    }
+    }*/
 }

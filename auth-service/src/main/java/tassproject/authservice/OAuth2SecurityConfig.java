@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;                    // ★
+import org.springframework.security.config.Customizer;      // ★
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -16,7 +18,7 @@ public class OAuth2SecurityConfig {
     private final RestAuthenticationEntryPoint restEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
 
-    @Bean
+    /*@Bean
     @Order(1)
     public SecurityFilterChain oauth2LoginFilterChain(HttpSecurity http) throws Exception {
         http
@@ -27,17 +29,18 @@ public class OAuth2SecurityConfig {
                         "/actuator/**"
                 )
                 .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll()
-                )
+                            .authorizeHttpRequests(auth -> auth
+                                    // ★ sempre OK il preflight
+                                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                                    .anyRequest().permitAll()
+                            )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restEntryPoint)
                         .accessDeniedHandler(restAccessDeniedHandler)
                 )
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .oauth2Login(oauth2 -> oauth2
-                        .successHandler(successHandler)
-                );
+                .oauth2Login(oauth2 -> oauth2.successHandler(successHandler))
+                .cors(Customizer.withDefaults());
         return http.build();
-    }
+    }*/
 }

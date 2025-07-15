@@ -9,7 +9,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import tassproject.dispensationservice.repository.DispensationRepository;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -33,7 +32,7 @@ class DispensationRepositoryIT {
     }
 
     @Autowired
-    private DispensationRepository repo;
+    private tassproject.dispensationservice.repository.DispensationRepository repo;
 
     @Test
     void saveAndQuery() {

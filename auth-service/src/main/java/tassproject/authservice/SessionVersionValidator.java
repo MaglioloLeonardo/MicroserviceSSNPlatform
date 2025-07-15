@@ -19,16 +19,20 @@ public class SessionVersionValidator implements OAuth2TokenValidator<Jwt> {
 
     @Override
     public OAuth2TokenValidatorResult validate(Jwt token) {
-        Integer ver      = token.getClaim("ver");
-        String  username = token.getSubject();
+        // Prendi il claim "ver" come Number (gestisce Long, Integer, ecc.)
+        Number rawVer = token.getClaim("ver");
+        String username = token.getSubject();
 
-        if (ver == null || username == null) {
+        if (rawVer == null || username == null) {
             return OAuth2TokenValidatorResult.failure(
                     new OAuth2Error("invalid_token", "Missing 'ver' claim or subject", null));
         }
 
+        // Converte in int (o long se preferisci) e confronta con il DB
+        int ver = rawVer.intValue();
+
         boolean valid = users.findByUsername(username.toLowerCase())
-                .map(u -> ver.equals(u.getSessionVersion()))
+                .map(u -> ver == u.getSessionVersion())  // qui u.getSessionVersion() è un Integer
                 .orElse(false);
 
         return valid

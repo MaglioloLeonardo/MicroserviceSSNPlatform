@@ -206,20 +206,6 @@ Soluzione strutturata: usa un file di environment (http-client.env.json) per pre
 
 
 
-
-
-
-
-
-Hai detto:
-Descrivi le API dettagliatamente così che possa passarlo a un LLM atto a usarle per fare il frontend
-
-
-ChatGPT ha detto:
-
-Ragionato per 8 secondi
-Ecco la descrizione completa di tutte le API esposte dall’API-Gateway (default http://localhost:8080) così da poterla fornire a un LLM o usarla direttamente per costruire il frontend.
-
 Base URL
 css
 Copia

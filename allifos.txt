@@ -42,6 +42,21 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- ★ protezione JWT -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <!-- ★ JOSE support -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
+        <!-- ★ WebFlux per propagare header -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -107,53 +122,64 @@ public class GlobalCorsConfig {
 }
 
 
-### File: api-gateway/src/main/java/tassproject/apigateway/JwtCookieAuthWebFilter.java
+### File: api-gateway/src/main/java/tassproject/apigateway/JwtHeaderOrCookieAuthWebFilter.java
 ----------------------------------------
 package tassproject.apigateway;
 
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
-/**
- * Questo filtro intercetta la richiesta:
- * - Se manca l'header Authorization ma esiste il cookie access_token, aggiunge l'header.
- */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
-public class JwtCookieAuthWebFilter implements WebFilter {
+public class JwtHeaderOrCookieAuthWebFilter implements WebFilter {
 
-    private static final String COOKIE_NAME = "access_token";
+    private final ReactiveJwtDecoder jwtDecoder;
+    private final ReactiveJwtAuthenticationConverterAdapter converter;
+
+    public JwtHeaderOrCookieAuthWebFilter(
+            ReactiveJwtDecoder jwtDecoder,
+            ReactiveJwtAuthenticationConverterAdapter converter
+    ) {
+        this.jwtDecoder = jwtDecoder;
+        this.converter  = converter;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        HttpCookie cookie = exchange.getRequest().getCookies().getFirst("access_token");
+        String token = null;
 
-        // Se già presente Authorization, passa avanti
-        if (authHeader != null && !authHeader.isBlank()) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else if (cookie != null) {
+            token = cookie.getValue();
+        }
+        if (token == null) {
             return chain.filter(exchange);
         }
 
-        // Altrimenti cerca il cookie
-        return Mono.defer(() -> {
-            var cookie = exchange.getRequest().getCookies().getFirst(COOKIE_NAME);
-            if (cookie != null && cookie.getValue() != null && !cookie.getValue().isBlank()) {
-                // Crea una nuova request con l'header Authorization: Bearer <cookie_value>
-                ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + cookie.getValue())
-                        .build();
-                ServerWebExchange mutatedExchange = exchange.mutate().request(mutatedRequest).build();
-                return chain.filter(mutatedExchange);
-            }
-            // Nessun JWT in header o cookie → passa avanti senza mutare nulla (scatta la security dopo)
-            return chain.filter(exchange);
-        });
+        return jwtDecoder.decode(token)
+                .flatMap(jwt -> converter.convert(jwt))
+                .flatMap(auth ->
+                        chain.filter(exchange)
+                                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth))
+                )
+                .onErrorResume(e -> unauthorized(exchange));
+    }
+
+    private Mono<Void> unauthorized(ServerWebExchange exchange) {
+        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+        return exchange.getResponse().setComplete();
     }
 }
 
@@ -165,10 +191,13 @@ package tassproject.apigateway;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.*;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 
 import javax.crypto.SecretKey;
@@ -185,31 +214,37 @@ public class SecurityConfig {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(ex -> ex
-                        .pathMatchers("/oauth2/**", "/login/**").permitAll()
-                        .pathMatchers("/api/v1/auth/**", "/actuator/**").permitAll()
+                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .pathMatchers("/oauth2/**","/login/**","/api/v1/auth/**","/actuator/**").permitAll()
                         .anyExchange().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt());
-
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(grantConverter()))
+                )
+                .cors(Customizer.withDefaults());
         return http.build();
     }
 
-    /**
-     * Usa la chiave fornita tramite property / env var “jwt.secret”.
-     * Se la stringa è Base‑64 la decodifichiamo, altrimenti la
-     * trattiamo come testo puro UTF‑8.
-     */
+    @Bean
+    public ReactiveJwtAuthenticationConverterAdapter grantConverter() {
+        JwtGrantedAuthoritiesConverter conv = new JwtGrantedAuthoritiesConverter();
+        conv.setAuthorityPrefix("ROLE_");
+        conv.setAuthoritiesClaimName("role");
+        JwtAuthenticationConverter jwtConv = new JwtAuthenticationConverter();
+        jwtConv.setJwtGrantedAuthoritiesConverter(conv);
+        return new ReactiveJwtAuthenticationConverterAdapter(jwtConv);
+    }
+
     @Bean
     public ReactiveJwtDecoder jwtDecoder(
-            @Value("${jwt.secret:my_jwt_secret}") String secret) {
-
+            @Value("${jwt.secret:my_jwt_secret}") String secret
+    ) {
         byte[] keyBytes;
         try {
             keyBytes = Base64.getDecoder().decode(secret);
         } catch (IllegalArgumentException ex) {
             keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         }
-
         SecretKey key = new SecretKeySpec(keyBytes, "HmacSHA256");
         return NimbusReactiveJwtDecoder.withSecretKey(key).build();
     }
@@ -220,7 +255,35 @@ public class SecurityConfig {
 ----------------------------------------
 spring.application.name=api-gateway
 server.port=${SERVER_PORT:8080}
-logging.level.org.springframework.security=INFO
+
+logging.level.org.springframework.security = DEBUG
+logging.level.org.springframework.security.oauth2 = TRACE
+logging.level.org.springframework.web = DEBUG
+logging.level.tassproject.apigateway = DEBUG
+
+
+
+logging.level.org.springframework.cloud.gateway = TRACE
+
+logging.level.org.springframework.cloud.gateway.route = DEBUG
+:
+logging.level.tassproject.apigateway.filters = DEBUG
+
+
+logging.level.reactor.netty = INFO   
+logging.level.reactor.netty.http.client = DEBUG
+logging.level.reactor.netty.http.server = DEBUG
+
+#
+logging.level.org.springframework.web.reactive = DEBUG
+logging.level.org.springframework.web.server.adapter.HttpWebHandlerAdapter = TRACE
+
+
+# RouteHandlerMapping, health, metrics ecc.
+logging.level.org.springframework.boot.actuate.endpoint.web = DEBUG
+logging.level.org.springframework.boot.actuate.gateway = DEBUG
+
+
 # (NO JDBC: questo servizio non usa database direttamente)
 # (NO JPA)
 # (NO HikariCP)
@@ -230,7 +293,7 @@ management.endpoints.web.exposure.include=health,info
 
 # === JWT segreto condiviso con auth-service ===
 jwt.secret=${JWT_SECRET:my_jwt_secret}
-
+jwt.expiration=${JWT_EXPIRATION_MS:3600000}
 
 
 ### File: api-gateway/src/main/resources/application.yml
@@ -255,15 +318,13 @@ spring:
       routes:
 
         # ─────────────  OAUTH2 GOOGLE  ─────────────
-        # (1) richiesta iniziale /oauth2/authorization/google
         - id: oauth2-authorization
-          uri: http://auth-service:8080      # dentro la rete Docker
+          uri: http://auth-service:8080
           predicates:
             - Path=/oauth2/authorization/google
           filters:
-            - PreserveHostHeader             # host esterno rimane “localhost:8080”
+            - PreserveHostHeader
 
-        # (2) callback /login/oauth2/**
         - id: oauth2-callback
           uri: http://auth-service:8080
           predicates:
@@ -277,17 +338,30 @@ spring:
           predicates:
             - Path=/api/v1/auth/**
 
+        # ─────────────  USER INFO / ROLES  ─────────────
+        - id: user-service
+          uri: http://auth-service:8080
+          predicates:
+            - Path=/api/v1/users/**
+
         # ─────────────  PRESCRIPTION  ─────────────
         - id: prescription-service
           uri: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
           predicates:
-            - Path=/api/v1/prescriptions/**,/api/v1/patients/{patientId}/prescriptions/**
+            - Path=/api/v1/prescriptions/**
+            - Path=/api/v1/patients/*/prescriptions/**
+            - Path=/api/v1/doctors/**
+            - Path=/api/v1/patients/*/drugs/**
+            - Path=/api/v1/patients/*/doctors/**
 
         # ─────────────  DISPENSATION  ─────────────
         - id: dispensation-service
           uri: ${DISPENSATION_SERVICE_URL:http://dispensation-service:8080}
           predicates:
-            - Path=/api/v1/dispensations/**,/api/v1/prescriptions/*/dispensations/**
+            - Path=/api/v1/dispensations/**
+            - Path=/api/v1/prescriptions/*/dispensations/**
+            - Path=/api/v1/pharmacists/**
+            - Path=/api/v1/patients/*/pharmacists/**
 
         # ─────────────  INVENTORY  ─────────────
         - id: inventory-service
@@ -303,6 +377,7 @@ spring:
 
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
+        - PreserveHostHeader
 
 
 ### File: api-gateway/src/test/java/tassproject/apigateway/ApiGatewayApplicationTests.java
@@ -439,12 +514,16 @@ class ApiGatewayApplicationTests {
 ----------------------------------------
 package tassproject.authservice.controller;
 
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import tassproject.authservice.*;
-import tassproject.authservice.AuthService;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -453,15 +532,57 @@ public class AuthController {
 
     private final AuthService auth;
 
+    /* ---------------- REGISTER ---------------- */
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse register(@Valid @RequestBody RegisterRequest body) {
         return auth.register(body);
     }
 
-    @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest body) {
-        return auth.login(body);
+        /* ---------------- LOGIN ------------------- */
+                @PostMapping("/login")
+    public AuthResponse login(
+            @Valid @RequestBody LoginRequest body,
+            HttpServletResponse response
+    ) {
+                // 1) Effettuo l’autenticazione e genero il JWT
+                        AuthResponse authResp = auth.login(body);
+
+                        // 2) Imposto il cookie HttpOnly con il token
+                                Cookie jwtCookie = new Cookie("access_token", authResp.accessToken());
+                jwtCookie.setHttpOnly(true);
+                jwtCookie.setSecure(true);    // in produzione lascia true
+                jwtCookie.setPath("/");
+                jwtCookie.setMaxAge(3600);    // durata in secondi (come jwt.expiration)
+                response.addCookie(jwtCookie);
+
+                        // 3) Ritorno l’intero AuthResponse (tokenType + accessToken) come JSON
+                                return authResp;
+            }
+
+    /* ---------------- LOGIN AUTOMATICO -------- */
+    @GetMapping("/me")
+    public User me(Authentication authentication) {
+        if (authentication == null)
+            throw new IllegalStateException("Non autenticato");
+        return auth.me(authentication.getName());
+    }
+
+    /* ---------------- LOGOUT COMPLETO --------- */
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(Authentication authentication,
+                       HttpServletResponse response) {
+
+        if (authentication != null) {
+            auth.logout(authentication.getName());
+        }
+        /* cancella eventuale cookie JWT (se lo usi) */
+        Cookie cookie = new Cookie("access_token", null);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
     }
 }
 
@@ -484,6 +605,7 @@ package tassproject.authservice;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tassproject.authservice.repository.UserRepository;
 
 @Service
@@ -494,39 +616,47 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
-    /* ───────── REGISTER ───────── */
-
+    /* --------- REGISTER --------------------------------------------------- */
     public AuthResponse register(RegisterRequest request) {
         String username = request.email().toLowerCase();
-
-        if (users.findByUsername(username).isPresent()) {
+        if (users.findByUsername(username).isPresent())
             throw new IllegalArgumentException("Username già in uso");
-        }
 
         User user = new User(
                 username,
                 passwordEncoder.encode(request.password()),
                 request.role()
         );
-
         users.save(user);
+        String token = jwtUtil.generateToken(user);
+        return new AuthResponse("Bearer", token);
+    }
+
+    /* --------- LOGIN ------------------------------------------------------ */
+    public AuthResponse login(LoginRequest request) {
+        User user = users.findByUsername(request.email().toLowerCase())
+                .orElseThrow(() -> new IllegalArgumentException("Credenziali non valide"));
+
+        if (!passwordEncoder.matches(request.password(), user.getPassword()))
+            throw new IllegalArgumentException("Credenziali non valide");
 
         String token = jwtUtil.generateToken(user);
         return new AuthResponse("Bearer", token);
     }
 
-    /* ─────────  LOGIN  ───────── */
+    /* --------- LOGOUT: invalida tutte le sessioni ------------------------- */
+    @Transactional
+    public void logout(String username) {
+        users.findByUsername(username.toLowerCase()).ifPresent(u -> {
+            u.setSessionVersion(u.getSessionVersion() + 1);   // bump version
+            users.save(u);
+        });
+    }
 
-    public AuthResponse login(LoginRequest request) {
-        User user = users.findByUsername(request.email().toLowerCase())
-                .orElseThrow(() -> new IllegalArgumentException("Credenziali non valide"));
-
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new IllegalArgumentException("Credenziali non valide");
-        }
-
-        String token = jwtUtil.generateToken(user);
-        return new AuthResponse("Bearer", token);
+    /* --------- ME: info per login automatico ------------------------------ */
+    public User me(String username) {
+        return users.findByUsername(username.toLowerCase())
+                .orElseThrow(() -> new IllegalStateException("Utente non trovato"));
     }
 }
 
@@ -637,6 +767,7 @@ import io.jsonwebtoken.io.DecodingException;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
 import javax.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -661,26 +792,27 @@ public class JwtUtil {
         } catch (IllegalArgumentException | DecodingException ex) {
             keyBytes = secretValue.getBytes(StandardCharsets.UTF_8);
         }
-
         if (keyBytes.length < 32) {
             throw new IllegalStateException(
                     "Il JWT_SECRET configurato è troppo corto (" +
                             (keyBytes.length * 8) + " bit). " +
-                            "Deve essere almeno 256 bit. Genera con: openssl rand -base64 32"
+                            "Deve essere almeno 256 bit."
             );
         }
-
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
+    /* ⇢ MODIFICATO: claim 'ver' ------------------------------------------------ */
     public String generateToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getUsername())
+                .claim("ver", user.getSessionVersion())          // <—
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
+    /* ------------------------------------------------------------------------- */
 
     public String getUsernameFromToken(String token) {
         return Jwts.parser()
@@ -689,15 +821,6 @@ public class JwtUtil {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
-    }
-
-    public boolean validateToken(String token) {
-        try {
-            Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
-            return true;
-        } catch (Exception ex) {
-            return false;
-        }
     }
 }
 
@@ -802,6 +925,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;                    // ★
+import org.springframework.security.config.Customizer;      // ★
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -825,17 +950,18 @@ public class OAuth2SecurityConfig {
                         "/actuator/**"
                 )
                 .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll()
-                )
+                            .authorizeHttpRequests(auth -> auth
+                                    // ★ sempre OK il preflight
+                                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                                    .anyRequest().permitAll()
+                            )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restEntryPoint)
                         .accessDeniedHandler(restAccessDeniedHandler)
                 )
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .oauth2Login(oauth2 -> oauth2
-                        .successHandler(successHandler)
-                );
+                .oauth2Login(oauth2 -> oauth2.successHandler(successHandler))
+                .cors(Customizer.withDefaults());
         return http.build();
     }
 }
@@ -984,10 +1110,13 @@ public enum Role {
 package tassproject.authservice;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -999,42 +1128,46 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.access.AccessDeniedHandler;
-import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import tassproject.authservice.repository.UserRepository;
 
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
+import javax.crypto.SecretKey;
 
+/**
+ * Configurazione di sicurezza per l’auth‑service.
+ * ‑ JWT firmati e verificati con la stessa chiave HS‑256
+ * ‑ Login classico + OAuth2 Google
+ * ‑ Resource‑server stateless
+ * ‑ CORS abilitato per http://localhost:3000 e header Authorization
+ */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
-public class SecurityConfig {
+public class SecurityConfig implements WebMvcConfigurer {
 
     private final UserRepository users;
     private final RestAuthenticationEntryPoint restEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
-    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;  // <— iniettato
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 
-    // -------- UserDetailsService --------
     @Bean
     public UserDetailsService userDetailsService() {
-        return username -> users.findByUsername(username.toLowerCase())
-                .map(user -> org.springframework.security.core.userdetails.User
-                        .withUsername(user.getUsername())
-                        .password(user.getPassword())
-                        .roles(user.getRole().name())
+        return username -> users
+                .findByUsername(username.toLowerCase())
+                .map(u -> org.springframework.security.core.userdetails.User
+                        .withUsername(u.getUsername())
+                        .password(u.getPassword())
+                        .roles(u.getRole().name())
                         .build())
                 .orElseThrow(() ->
                         new UsernameNotFoundException("Utente non trovato: " + username));
     }
 
-    // -------- Encoder / AuthenticationManager --------
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -1048,42 +1181,110 @@ public class SecurityConfig {
         return new ProviderManager(provider);
     }
 
-    // -------- JWT encoder/decoder --------
     @Bean
-    public JwtEncoder jwtEncoder(@Value("${jwt.secret:my_jwt_secret}") String secret) {
-        return new NimbusJwtEncoder(new ImmutableSecret<>(secret.getBytes(StandardCharsets.UTF_8)));
+    public JwtEncoder jwtEncoder(@Value("${jwt.secret}") String secret) {
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT secret must be ≥ 256 bit (32 byte)");
+        }
+        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+        return new NimbusJwtEncoder(new ImmutableSecret<>(key));
     }
 
     @Bean
-    public JwtDecoder jwtDecoder(@Value("${jwt.secret:my_jwt_secret}") String secret) {
-        return NimbusJwtDecoder
-                .withSecretKey(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"))
-                .build();
+    public JwtDecoder jwtDecoder(@Value("${jwt.secret}") String secret) {
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT secret must be ≥ 256 bit (32 byte)");
+        }
+        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).build();
+        OAuth2TokenValidator<Jwt> defaultVal   = JwtValidators.createDefault();
+        OAuth2TokenValidator<Jwt> sessionValid = new SessionVersionValidator(users);
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaultVal, sessionValid));
+
+        return decoder;
     }
 
-    // -------- Security filter chain --------
+    /** Configura CORS per far passare l’header Authorization dal client */
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOrigins("http://localhost:3000")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("Authorization", "Content-Type")
+                .allowCredentials(true);
+    }
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           AuthenticationManager authManager) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**", "/actuator/**").permitAll()
+                .cors(Customizer.withDefaults())
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(req -> req
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/oauth2/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restEntryPoint)
                         .accessDeniedHandler(restAccessDeniedHandler)
                 )
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationManager(authenticationManager(userDetailsService()))
-                .oauth2Login(oauth2 -> oauth2
-                        .successHandler(oAuth2LoginSuccessHandler)      // <— qui
-                )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(Customizer.withDefaults())
-                );
+                .authenticationManager(authManager)
+                .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2LoginSuccessHandler))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
 
         return http.build();
+    }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/SessionVersionValidator.java
+----------------------------------------
+package tassproject.authservice;
+
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.Jwt;
+import tassproject.authservice.repository.UserRepository;
+
+/**
+ * Rifiuta i JWT la cui 'ver' non coincide con la sessionVersion salvata a DB.
+ */
+public class SessionVersionValidator implements OAuth2TokenValidator<Jwt> {
+
+    private final UserRepository users;
+
+    public SessionVersionValidator(UserRepository users) {
+        this.users = users;
+    }
+
+    @Override
+    public OAuth2TokenValidatorResult validate(Jwt token) {
+        // Prendi il claim "ver" come Number (gestisce Long, Integer, ecc.)
+        Number rawVer = token.getClaim("ver");
+        String username = token.getSubject();
+
+        if (rawVer == null || username == null) {
+            return OAuth2TokenValidatorResult.failure(
+                    new OAuth2Error("invalid_token", "Missing 'ver' claim or subject", null));
+        }
+
+        // Converte in int (o long se preferisci) e confronta con il DB
+        int ver = rawVer.intValue();
+
+        boolean valid = users.findByUsername(username.toLowerCase())
+                .map(u -> ver == u.getSessionVersion())  // qui u.getSessionVersion() è un Integer
+                .orElse(false);
+
+        return valid
+                ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(
+                new OAuth2Error("invalid_token", "Session revoked", null));
     }
 }
 
@@ -1112,44 +1313,62 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
-    public User() {}
+    /* ⇢ NUOVO ⇠  --------------------------------------------- */
+    /** Versione della sessione.
+     *  Ogni logout incrementa questo valore; i JWT precedenti
+     *  (che portano una 'ver' più bassa) diventano invalidi. */
+    @Column(name = "session_version", nullable = false)
+    private Integer sessionVersion = 0;
+    /* -------------------------------------------------------- */
+
+    /* --- costruttori --------------------------------------- */
+    protected User() {}
 
     public User(String username, String password, Role role) {
         this.username = username;
         this.password = password;
-        this.role = role;
+        this.role     = role;
+        this.sessionVersion = 0;
     }
 
-    public Long getId() {
-        return id;
-    }
+    /* --- getters & setters -------------------------------- */
+    public Long getId()                     { return id; }
+    public String getUsername()             { return username; }
+    public String getPassword()             { return password; }
+    public Role getRole()                   { return role; }
+    public Integer getSessionVersion()      { return sessionVersion; }
 
-    public String getUsername() {
-        return username;
-    }
+    public void setId(Long id)                  { this.id = id; }
+    public void setUsername(String username)    { this.username = username; }
+    public void setPassword(String password)    { this.password = password; }
+    public void setRole(Role role)              { this.role = role; }
+    public void setSessionVersion(Integer ver)  { this.sessionVersion = ver; }
+}
 
-    public String getPassword() {
-        return password;
-    }
 
-    public Role getRole() {
-        return role;
-    }
+### File: auth-service/src/main/java/tassproject/authservice/UserQueryController.java
+----------------------------------------
+package tassproject.authservice;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+import tassproject.authservice.repository.UserRepository;
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
+import java.util.List;
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
+@RestController
+@RequestMapping("/api/v1/users")
+@RequiredArgsConstructor
+public class UserQueryController {
 
-    public void setRole(Role role) {
-        this.role = role;
+    private final UserRepository users;
+
+    /* 8) ruoli associati ad un utente */
+    @GetMapping("/{username}/roles")
+    public List<Role> roles(@PathVariable String username) {
+        return users.findByUsername(username.toLowerCase())
+                .map(u -> List.of(u.getRole()))
+                .orElse(List.of());
     }
 }
 
@@ -1173,7 +1392,34 @@ public interface UserRepository extends JpaRepository<User, Long> {
 ### File: auth-service/src/main/resources/application.properties
 ----------------------------------------
 # ????????? Logging Spring Security ?????????
-logging.level.org.springframework.security=INFO
+
+logging.level.org.springframework.security = DEBUG
+logging.level.org.springframework.security.oauth2 = TRACE
+logging.level.org.springframework.web = DEBUG
+logging.level.tassproject.apigateway = DEBUG
+
+
+
+logging.level.org.springframework.cloud.gateway = TRACE
+
+logging.level.org.springframework.cloud.gateway.route = DEBUG
+
+logging.level.tassproject.apigateway.filters = DEBUG
+
+
+logging.level.reactor.netty = INFO  
+logging.level.reactor.netty.http.client = DEBUG
+logging.level.reactor.netty.http.server = DEBUG
+
+
+logging.level.org.springframework.web.reactive = DEBUG
+logging.level.org.springframework.web.server.adapter.HttpWebHandlerAdapter = TRACE
+
+
+# RouteHandlerMapping, health, metrics ecc.
+logging.level.org.springframework.boot.actuate.endpoint.web = DEBUG
+logging.level.org.springframework.boot.actuate.gateway = DEBUG
+
 
 # ????????? Spring Boot ?????????
 spring.application.name=auth-service
@@ -1191,7 +1437,7 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 spring.jpa.properties.hibernate.default_schema=auth_service
 
 # ????????? JWT Settings ?????????
-jwt.secret=${JWT_SECRET:U8mG8YkqzUjH9iMz4HfA3V6pEJxQ1r4z7NnYtX9aQ2M=}
+jwt.secret=${JWT_SECRET:my_jwt_secret}
 jwt.expiration=${JWT_EXPIRATION_MS:3600000}
 
 # ????????? OAuth2 Google Registration ?????????
@@ -1424,6 +1670,29 @@ class CommonApplicationTests {
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-config</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <!-- ★ Resource Server OAuth2 per Jwt -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
+        <!-- ★ JOSE support (JWT decoding) -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
 
     </dependencies>
 
@@ -1439,16 +1708,87 @@ class CommonApplicationTests {
 </project>
 
 
-### File: dispensation-service/src/main/java/DispensationRepository.java
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/AuthorizationService.java
 ----------------------------------------
-package tassproject.dispensationservice.repository;
+package tassproject.dispensationservice.security;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import tassproject.dispensationservice.Dispensation;
+import jakarta.annotation.Nonnull;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import tassproject.dispensationservice.client.PrescriptionClient;
+import tassproject.dispensationservice.repository.DispensationRepository;
 
 import java.util.UUID;
 
-public interface DispensationRepository extends JpaRepository<Dispensation, UUID> {
+@Component
+@Transactional(readOnly = true)
+public class AuthorizationService {
+
+    private final DispensationRepository dispensations;
+    private final PrescriptionClient prescriptions;   // ← nuovo client REST
+
+    public AuthorizationService(DispensationRepository disp,
+                                PrescriptionClient presc) {
+        this.dispensations = disp;
+        this.prescriptions = presc;
+    }
+
+    /* -------- utilities JWT -------- */
+    private Authentication auth() {
+        return org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+    }
+
+    private String role() {
+        return auth().getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).findFirst().orElse("");
+    }
+
+    private UUID userId() {
+        var token = (JwtAuthenticationToken) auth();
+        String id = token.getToken().getClaimAsString("citizen_id");
+        if (id == null) throw new AccessDeniedException("Missing claim citizen_id");
+        return UUID.fromString(id);
+    }
+
+    /* ---------- checks ------------ */
+    public void assertCanAccessPharmacist(@Nonnull UUID pharmacistId) {
+        switch (role()) {
+            case "ROLE_PHARMACIST" -> {
+                if (!userId().equals(pharmacistId))
+                    deny("Puoi vedere solo i tuoi ordini.");
+            }
+            case "ROLE_ADMIN" -> { }
+            default -> deny("Solo il farmacista interessato può accedere.");
+        }
+    }
+
+    public void assertCanAccessPatient(@Nonnull UUID patientId) {
+        switch (role()) {
+            case "ROLE_PATIENT" -> {
+                if (!userId().equals(patientId))
+                    deny("Puoi vedere solo i tuoi dati.");
+            }
+            case "ROLE_PHARMACIST" -> {
+                /* verifichiamo di aver dispensato al paziente */
+                boolean served = dispensations.findByDispensedBy(userId()).stream()
+                        .map(d -> prescriptions.getPrescription(d.getPrescriptionId()))
+                        .filter(dto -> dto != null && dto.patientId().equals(patientId))
+                        .findAny().isPresent();
+                if (!served) deny("Non hai mai servito questo paziente.");
+            }
+            case "ROLE_ADMIN" -> { }
+            default -> deny("Accesso non consentito.");
+        }
+    }
+
+    private void deny(String msg) {
+        throw new AccessDeniedException(msg);
+    }
 }
 
 
@@ -1553,9 +1893,9 @@ public class Dispensation {
 package tassproject.dispensationservice;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tassproject.dispensationservice.client.PrescriptionClient;
 import tassproject.dispensationservice.repository.DispensationRepository;
 
 import java.time.OffsetDateTime;
@@ -1567,37 +1907,68 @@ import java.util.UUID;
 public class DispensationApplicationService {
 
     private final DispensationRepository repo;
+    private final PrescriptionClient prescriptions;   // ← nuovo client REST
     private final RabbitTemplate rabbitTemplate;
 
-    @Autowired
     public DispensationApplicationService(DispensationRepository repo,
+                                          PrescriptionClient prescriptions,
                                           RabbitTemplate rabbitTemplate) {
-        this.repo = repo;
+        this.repo           = repo;
+        this.prescriptions  = prescriptions;
         this.rabbitTemplate = rabbitTemplate;
     }
 
+    /* ------------------------- CREA ------------------------- */
     public DispensationResponse dispense(CreateDispensationRequest request) {
         var entity = new Dispensation(
                 UUID.randomUUID(),
                 request.prescriptionId(),
                 OffsetDateTime.now(),
                 request.dispensedBy(),
-                Dispensation.Status.DONE
-        );
+                Dispensation.Status.DONE);
+
         entity = repo.save(entity);
-        rabbitTemplate.convertAndSend(
-                "dispensation.events",
+        rabbitTemplate.convertAndSend("dispensation.events",
                 "PrescriptionDispensed",
-                entity.getPrescriptionId()
-        );
+                entity.getPrescriptionId());
         return DispensationResponse.from(entity);
     }
 
+    /* --------------------- QUERY BASE ----------------------- */
     @Transactional(readOnly = true)
     public List<DispensationResponse> listByPrescription(UUID prescriptionId) {
-        return repo.findAll().stream()
-                .filter(d -> d.getPrescriptionId().equals(prescriptionId))
-                .map(DispensationResponse::from)
+        return repo.findByPrescriptionIdIn(List.of(prescriptionId))
+                .stream().map(DispensationResponse::from).toList();
+    }
+
+    /* 4) ordini di un farmacista */
+    @Transactional(readOnly = true)
+    public List<DispensationResponse> listByPharmacist(UUID pharmacistId) {
+        return repo.findByDispensedBy(pharmacistId)
+                .stream().map(DispensationResponse::from).toList();
+    }
+
+    /* 2) pazienti serviti da un farmacista */
+    @Transactional(readOnly = true)
+    public List<UUID> patientsByPharmacist(UUID pharmacistId) {
+        return repo.findByDispensedBy(pharmacistId).stream()
+                .map(Dispensation::getPrescriptionId)
+                .map(prescriptions::getPrescription)          // REST call
+                .filter(dto -> dto != null)
+                .map(PrescriptionClient.PrescriptionDTO::patientId)
+                .distinct()
+                .toList();
+    }
+
+    /* 2‑bis) farmacisti che hanno servito un paziente */
+    @Transactional(readOnly = true)
+    public List<UUID> pharmacistsByPatient(UUID patientId) {
+        List<UUID> prescIds = prescriptions.listPrescriptionIdsByPatient(patientId);
+        if (prescIds == null || prescIds.isEmpty()) return List.of();
+
+        return repo.findByPrescriptionIdIn(prescIds).stream()
+                .map(Dispensation::getDispensedBy)
+                .distinct()
                 .toList();
     }
 }
@@ -1610,6 +1981,10 @@ package tassproject.dispensationservice;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import tassproject.dispensationservice.client.PrescriptionClient;
+import tassproject.dispensationservice.security.AuthorizationService;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -1618,22 +1993,75 @@ import java.util.UUID;
 public class DispensationController {
 
     private final DispensationApplicationService service;
+    private final AuthorizationService           authz;
+    private final PrescriptionClient             prescriptions;   // ← nuovo
 
-    // Costruttore esplicito con service iniettato da Spring
-    public DispensationController(DispensationApplicationService service) {
-        this.service = service;
+    public DispensationController(DispensationApplicationService service,
+                                  AuthorizationService authz,
+                                  PrescriptionClient prescriptions) {
+        this.service        = service;
+        this.authz          = authz;
+        this.prescriptions  = prescriptions;
     }
 
+    /* ------------------------------ CREA ------------------------------ */
     @PostMapping("/dispensations")
     @ResponseStatus(HttpStatus.CREATED)
-    public DispensationResponse dispense(@Valid @RequestBody CreateDispensationRequest request) {
-        return service.dispense(request);
+    public DispensationResponse dispense(@Valid @RequestBody CreateDispensationRequest body) {
+        authz.assertCanAccessPharmacist(body.dispensedBy());
+        return service.dispense(body);
     }
 
+    /* -------------------------- QUERY PRESCRIZIONE -------------------- */
     @GetMapping("/prescriptions/{prescriptionId}/dispensations")
-    public List<DispensationResponse> list(@PathVariable UUID prescriptionId) {
+    public List<DispensationResponse> byPrescription(@PathVariable UUID prescriptionId) {
+        var dto = prescriptions.getPrescription(prescriptionId);
+        if (dto == null)
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Prescrizione inesistente");
+
+        authz.assertCanAccessPatient(dto.patientId());
         return service.listByPrescription(prescriptionId);
     }
+
+    /* ------------------------------ NUOVI ENDPOINT -------------------- */
+    @GetMapping("/pharmacists/{pharmacistId}/dispensations")
+    public List<DispensationResponse> byPharmacist(@PathVariable UUID pharmacistId) {
+        authz.assertCanAccessPharmacist(pharmacistId);
+        return service.listByPharmacist(pharmacistId);
+    }
+
+    @GetMapping("/pharmacists/{pharmacistId}/patients")
+    public List<UUID> patientsOfPharmacist(@PathVariable UUID pharmacistId) {
+        authz.assertCanAccessPharmacist(pharmacistId);
+        return service.patientsByPharmacist(pharmacistId);
+    }
+
+    @GetMapping("/patients/{patientId}/pharmacists")
+    public List<UUID> pharmacistsOfPatient(@PathVariable UUID patientId) {
+        authz.assertCanAccessPatient(patientId);
+        return service.pharmacistsByPatient(patientId);
+    }
+}
+
+
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/DispensationRepository.java
+----------------------------------------
+package tassproject.dispensationservice.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.dispensationservice.Dispensation;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+
+public interface DispensationRepository extends JpaRepository<Dispensation, UUID> {
+
+    /* 4) Ordini di un farmacista */
+    List<Dispensation> findByDispensedBy(UUID pharmacistId);
+
+    /* supporto a 2) / 6)  */
+    List<Dispensation> findByPrescriptionIdIn(Collection<UUID> prescriptionIds);
 }
 
 
@@ -1684,6 +2112,57 @@ public class DispensationServiceApplication {
 }
 
 
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/PrescriptionClient.java
+----------------------------------------
+package tassproject.dispensationservice.client;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+
+import java.util.List;
+import java.util.UUID;
+
+/** Client REST minimale verso prescription‑service (solo ciò che serve a dispensation‑service). */
+@Component
+public class PrescriptionClient {
+
+    private final WebClient webClient;
+
+    public PrescriptionClient(
+            @Value("${prescription-service.base-url:http://prescription-service:8080}")
+            String baseUrl) {
+
+        this.webClient = WebClient.builder()
+                .baseUrl(baseUrl)
+                .build();
+    }
+
+    /* DTO locale; evita di importare classi di un altro microservizio */
+    public record PrescriptionDTO(UUID id, UUID patientId, UUID doctorId) {}
+
+    /** Restituisce i dati minimi di una prescrizione. */
+    public PrescriptionDTO getPrescription(UUID id) {
+        return webClient.get()
+                .uri("/api/v1/prescriptions/{id}", id)
+                .retrieve()
+                .bodyToMono(PrescriptionDTO.class)
+                .block();
+    }
+
+    /** Elenco (solo id) di tutte le prescrizioni di un paziente – ci basta per query aggregata. */
+    public List<UUID> listPrescriptionIdsByPatient(UUID patientId) {
+        return webClient.get()
+                .uri("/api/v1/patients/{patientId}/prescriptions", patientId)
+                .retrieve()
+                .bodyToFlux(PrescriptionDTO.class)
+                .map(PrescriptionDTO::id)
+                .collectList()
+                .block();
+    }
+}
+
+
 ### File: dispensation-service/src/main/java/tassproject/dispensationservice/RabbitConfig.java
 ----------------------------------------
 package tassproject.dispensationservice;
@@ -1726,6 +2205,73 @@ public class RabbitConfig {
 }
 
 
+### File: dispensation-service/src/main/java/tassproject/dispensationservice/SecurityConfig.java
+----------------------------------------
+package tassproject.dispensationservice;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    /** Converte il claim “role” del JWT in autorità Spring Security ROLE_… */
+    private JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter converter = new JwtGrantedAuthoritiesConverter();
+        converter.setAuthorityPrefix("ROLE_");
+        converter.setAuthoritiesClaimName("role");
+
+        JwtAuthenticationConverter jwtConv = new JwtAuthenticationConverter();
+        jwtConv.setJwtGrantedAuthoritiesConverter(converter);
+        return jwtConv;
+    }
+
+    @Bean
+    SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(reg -> reg
+                        .requestMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .oauth2ResourceServer(oauth -> oauth
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                )
+                .httpBasic(Customizer.withDefaults());
+
+        return http.build();
+    }
+
+    /**
+     * Definisce il bean JwtDecoder per firmare/verificare token HMAC‑SHA256
+     * usando la chiave fornita tramite property/env var “jwt.secret”.
+     */
+    @Bean
+    public JwtDecoder jwtDecoder(@Value("${jwt.secret:my_jwt_secret}") String secret) {
+        byte[] keyBytes;
+        try {
+            keyBytes = java.util.Base64.getDecoder().decode(secret);
+        } catch (IllegalArgumentException ex) {
+            keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        }
+        javax.crypto.SecretKey key = new javax.crypto.spec.SecretKeySpec(keyBytes, "HmacSHA256");
+        return NimbusJwtDecoder.withSecretKey(key).build();
+    }
+}
+
+
 ### File: dispensation-service/src/main/resources/application.properties
 ----------------------------------------
 spring.application.name=dispensation-service
@@ -1748,6 +2294,19 @@ spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
 
+jwt.secret=${JWT_SECRET:my_jwt_secret}
+jwt.expiration=${JWT_EXPIRATION_MS:3600000}
+
+### File: dispensation-service/src/main/resources/application.yml
+----------------------------------------
+spring:
+  application:
+    name: dispensation-service
+
+# base‑url interno (default nel compose/network)
+prescription-service:
+  base-url: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
+
 
 ### File: dispensation-service/src/test/java/tassproject/dispensationservice/DispensationRepositoryIT.java
 ----------------------------------------
@@ -1762,7 +2321,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import tassproject.dispensationservice.repository.DispensationRepository;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -1786,7 +2344,7 @@ class DispensationRepositoryIT {
     }
 
     @Autowired
-    private DispensationRepository repo;
+    private tassproject.dispensationservice.repository.DispensationRepository repo;
 
     @Test
     void saveAndQuery() {
@@ -2211,6 +2769,8 @@ spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
 
+jwt.secret=${JWT_SECRET:my_jwt_secret}
+jwt.expiration=${JWT_EXPIRATION_MS:3600000}
 
 ### File: inventory-service/src/main/resources/db/migration/V1__drop_inventory_items_drug_fk.sql
 ----------------------------------------
@@ -2517,6 +3077,8 @@ spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
 
+jwt.secret=${JWT_SECRET:my_jwt_secret}
+jwt.expiration=${JWT_EXPIRATION_MS:3600000}
 
 ### File: notification-service/src/test/java/tassproject/notificationservice/NotificationServiceApplicationTests.java
 ----------------------------------------
@@ -2707,6 +3269,14 @@ class NotificationServiceApplicationTests {
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
@@ -2764,6 +3334,14 @@ class NotificationServiceApplicationTests {
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-config</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-resource-server</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -2806,6 +3384,94 @@ class NotificationServiceApplicationTests {
         </plugins>
     </build>
 </project>
+
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/AuthorizationService.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import jakarta.annotation.Nonnull;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import tassproject.prescriptionservice.repository.PrescriptionRepository;
+
+import java.util.UUID;
+
+@Component
+@Transactional(readOnly = true)
+public class AuthorizationService {
+
+    private final PrescriptionRepository prescriptions;
+
+    public AuthorizationService(PrescriptionRepository prescriptions) {
+        this.prescriptions = prescriptions;
+    }
+
+    /* ------------------------------------------------------------------
+       Utilities
+       ------------------------------------------------------------------ */
+    private Authentication auth() {
+        return org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+    }
+
+    private String role() {
+        return auth().getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).findFirst().orElse("");
+    }
+
+    private UUID userId() {
+        var token = (JwtAuthenticationToken) auth();
+        String id = token.getToken().getClaimAsString("citizen_id");
+        if (id == null) throw new AccessDeniedException("Missing claim citizen_id");
+        return UUID.fromString(id);
+    }
+
+    /* ------------------------------------------------------------------
+       Checks
+       ------------------------------------------------------------------ */
+
+    /** Verifica che chi chiede dati del paziente ne abbia diritto. */
+    public void assertCanAccessPatient(@Nonnull UUID patientId) {
+        switch (role()) {
+            case "ROLE_PATIENT" -> {
+                if (!userId().equals(patientId))
+                    deny("Puoi accedere solo alle tue informazioni.");
+            }
+            case "ROLE_DOCTOR" -> {
+                if (!prescriptions.existsByDoctorIdAndPatientId(userId(), patientId))
+                    deny("Non sei il medico di questo paziente.");
+            }
+            case "ROLE_PHARMACIST" -> deny("Un farmacista non può leggere dati clinici del paziente.");
+            case "ROLE_ADMIN" -> { /* sempre permesso */ }
+            default -> deny("Ruolo non riconosciuto.");
+        }
+    }
+
+    /** Verifica che chi chiede dati del medico sia il medico stesso
+     oppure un suo paziente. */
+    public void assertCanAccessDoctor(@Nonnull UUID doctorId) {
+        switch (role()) {
+            case "ROLE_DOCTOR" -> {
+                if (!userId().equals(doctorId)) deny("Non sei quel medico.");
+            }
+            case "ROLE_PATIENT" -> {
+                if (!prescriptions.existsByDoctorIdAndPatientId(doctorId, userId()))
+                    deny("Quel medico non ti ha mai in cura.");
+            }
+            case "ROLE_ADMIN" -> { }
+            default -> deny("Accesso non consentito.");
+        }
+    }
+
+    private void deny(String msg) {
+        throw new AccessDeniedException(msg);
+    }
+}
 
 
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/CreatePrescriptionRequest.java
@@ -2980,9 +3646,10 @@ public class Prescription {
 ----------------------------------------
 package tassproject.prescriptionservice;
 
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import tassproject.prescriptionservice.repository.PrescriptionItemRepository;
 import tassproject.prescriptionservice.repository.PrescriptionRepository;
 
 import java.util.List;
@@ -2991,17 +3658,22 @@ import java.util.UUID;
 @Service
 @Transactional
 public class PrescriptionApplicationService {
+
     private final PrescriptionRepository repo;
+    private final PrescriptionItemRepository items;
     private final RabbitTemplate rabbitTemplate;
 
     public PrescriptionApplicationService(PrescriptionRepository repo,
+                                          PrescriptionItemRepository items,
                                           RabbitTemplate rabbitTemplate) {
-        this.repo = repo;
+        this.repo           = repo;
+        this.items          = items;
         this.rabbitTemplate = rabbitTemplate;
     }
 
+    /* ------------------------------ CREA ------------------------------ */
     public PrescriptionResponse create(CreatePrescriptionRequest req) {
-        List<PrescriptionItem> items = req.items().stream()
+        List<PrescriptionItem> itemEntities = req.items().stream()
                 .map(dto -> new PrescriptionItem(
                         dto.drugId(),
                         dto.activeIngredientId(),
@@ -3015,22 +3687,17 @@ public class PrescriptionApplicationService {
                 req.patientId(),
                 req.exemption(),
                 req.therapyDuration(),
-                items);
+                itemEntities);
 
         entity = repo.save(entity);
-        rabbitTemplate.convertAndSend(
-                "prescription.events",
-                "PrescriptionCreated",
-                entity.getId());
-
+        rabbitTemplate.convertAndSend("prescription.events", "PrescriptionCreated", entity.getId());
         return PrescriptionResponse.from(entity);
     }
 
+    /* ------------------------------ QUERY BASE ------------------------ */
     @Transactional(readOnly = true)
     public PrescriptionResponse findById(UUID id) {
-        return repo.findById(id)
-                .map(PrescriptionResponse::from)
-                .orElseThrow();
+        return repo.findById(id).map(PrescriptionResponse::from).orElseThrow();
     }
 
     @Transactional(readOnly = true)
@@ -3043,20 +3710,46 @@ public class PrescriptionApplicationService {
                 .toList();
     }
 
+    /* ------------------------------ UPDATE STATO ---------------------- */
     public PrescriptionResponse updateStatus(UUID id, Prescription.Status newStatus) {
         Prescription entity = repo.findById(id).orElseThrow();
         switch (newStatus) {
-            case DISPENSED -> entity.markDispensed();
-            case COMPLETED -> entity.markCompleted();
-            case CANCELLED -> entity.cancel();
+            case DISPENSED  -> entity.markDispensed();
+            case COMPLETED  -> entity.markCompleted();
+            case CANCELLED  -> entity.cancel();
             default -> throw new IllegalStateException("Unsupported status transition");
         }
         repo.save(entity);
-        rabbitTemplate.convertAndSend(
-                "prescription.events",
-                "PrescriptionStatusChanged",
-                entity.getId());
+        rabbitTemplate.convertAndSend("prescription.events","PrescriptionStatusChanged", entity.getId());
         return PrescriptionResponse.from(entity);
+    }
+
+    /* ------------------------------ NUOVE QUERY ----------------------- */
+
+    /* 1) Pazienti di un medico */
+    @Transactional(readOnly = true)
+    public List<UUID> getPatientsByDoctor(UUID doctorId) {
+        return repo.findDistinctPatientIdsByDoctorId(doctorId);
+    }
+
+    /* 1‑bis) Medici di un paziente */
+    @Transactional(readOnly = true)
+    public List<UUID> getDoctorsByPatient(UUID patientId) {
+        return repo.findDistinctDoctorIdsByPatientId(patientId);
+    }
+
+    /* 3) Tutte le prescrizioni di un medico */
+    @Transactional(readOnly = true)
+    public List<PrescriptionResponse> findByDoctor(UUID doctorId) {
+        return repo.findByDoctorId(doctorId).stream()
+                .map(PrescriptionResponse::from)
+                .toList();
+    }
+
+    /* 6) Farmaci acquistati (erogati) da un paziente */
+    @Transactional(readOnly = true)
+    public List<UUID> getDrugIdsByPatient(UUID patientId) {
+        return items.findDistinctDrugIdsByPatientId(patientId);
     }
 }
 
@@ -3068,7 +3761,7 @@ package tassproject.prescriptionservice;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import tassproject.prescriptionservice.PrescriptionApplicationService;
+import tassproject.prescriptionservice.AuthorizationService;
 
 import java.util.List;
 import java.util.UUID;
@@ -3078,33 +3771,70 @@ import java.util.UUID;
 public class PrescriptionController {
 
     private final PrescriptionApplicationService service;
+    private final AuthorizationService authz;
 
-    // Costruttore esplicito per l’injection del service
-    public PrescriptionController(PrescriptionApplicationService service) {
+    public PrescriptionController(PrescriptionApplicationService service,
+                                  AuthorizationService authz) {
         this.service = service;
+        this.authz   = authz;
     }
+
+    /* ------------------------------ CRUD ESISTENTI -------------------- */
 
     @PostMapping("/prescriptions")
     @ResponseStatus(HttpStatus.CREATED)
     public PrescriptionResponse create(@Valid @RequestBody CreatePrescriptionRequest request) {
+        authz.assertCanAccessDoctor(request.doctorId());
+        authz.assertCanAccessPatient(request.patientId());
         return service.create(request);
     }
 
     @GetMapping("/prescriptions/{id}")
     public PrescriptionResponse findById(@PathVariable UUID id) {
-        return service.findById(id);
+        var resp = service.findById(id);
+        authz.assertCanAccessDoctor(resp.doctorId());
+        authz.assertCanAccessPatient(resp.patientId());
+        return resp;
     }
 
     @GetMapping("/patients/{patientId}/prescriptions/active")
     public List<PrescriptionResponse> findActive(@PathVariable UUID patientId) {
+        authz.assertCanAccessPatient(patientId);
         return service.findActiveByPatientId(patientId);
     }
 
     @PutMapping("/prescriptions/{id}/status")
-    public PrescriptionResponse updateStatus(
-            @PathVariable UUID id,
-            @Valid @RequestBody UpdatePrescriptionStatusRequest body) {
+    public PrescriptionResponse updateStatus(@PathVariable UUID id,
+                                             @Valid @RequestBody UpdatePrescriptionStatusRequest body) {
+        var resp = service.findById(id);
+        authz.assertCanAccessDoctor(resp.doctorId());
         return service.updateStatus(id, body.newStatus());
+    }
+
+    /* ------------------------------ NUOVI ENDPOINT -------------------- */
+
+    @GetMapping("/doctors/{doctorId}/patients")
+    public List<UUID> patientsOfDoctor(@PathVariable UUID doctorId) {
+        authz.assertCanAccessDoctor(doctorId);
+        return service.getPatientsByDoctor(doctorId);
+    }
+
+    @GetMapping("/patients/{patientId}/doctors")
+    public List<UUID> doctorsOfPatient(@PathVariable UUID patientId) {
+        authz.assertCanAccessPatient(patientId);
+        return service.getDoctorsByPatient(patientId);
+    }
+
+    @GetMapping("/doctors/{doctorId}/prescriptions")
+    public List<PrescriptionResponse> prescriptionsByDoctor(@PathVariable UUID doctorId) {
+        authz.assertCanAccessDoctor(doctorId);
+        return service.findByDoctor(doctorId);
+    }
+
+    @GetMapping("/patients/{patientId}/drugs")
+    public List<UUID> drugsByPatient(@PathVariable UUID patientId) {
+        authz.assertCanAccessPatient(patientId);
+        return service.getDrugIdsByPatient(patientId);
     }
 }
 
@@ -3251,26 +3981,56 @@ public record PrescriptionItemDto(
 
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionItemRepository.java
 ----------------------------------------
-// PrescriptionItemRepository.java
 package tassproject.prescriptionservice.repository;
 
-import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import tassproject.prescriptionservice.PrescriptionItem;
 
-public interface PrescriptionItemRepository extends JpaRepository<PrescriptionItem, UUID> { }
+import java.util.List;
+import java.util.UUID;
+
+public interface PrescriptionItemRepository extends JpaRepository<PrescriptionItem, UUID> {
+
+    /* farmaci (distinct) acquistati da un paziente */
+    @Query("""
+            select distinct i.drugId
+            from PrescriptionItem i
+            where i.prescription.patientId = :patientId
+          """)
+    List<UUID> findDistinctDrugIdsByPatientId(@Param("patientId") UUID patientId);
+}
 
 
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionRepository.java
 ----------------------------------------
-// PrescriptionRepository.java
 package tassproject.prescriptionservice.repository;
 
-import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import tassproject.prescriptionservice.Prescription;
 
-public interface PrescriptionRepository extends JpaRepository<Prescription, UUID> { }
+import java.util.List;
+import java.util.UUID;
+
+public interface PrescriptionRepository extends JpaRepository<Prescription, UUID> {
+
+    /* ------------- QUERY GIÀ PRESENTI ------------- */
+
+    List<Prescription> findByDoctorId(UUID doctorId);
+
+    @Query("select distinct p.patientId from Prescription p where p.doctorId = :doctorId")
+    List<UUID> findDistinctPatientIdsByDoctorId(@Param("doctorId") UUID doctorId);
+
+    @Query("select distinct p.doctorId from Prescription p where p.patientId = :patientId")
+    List<UUID> findDistinctDoctorIdsByPatientId(@Param("patientId") UUID patientId);
+
+    /* ------------- NUOVA UTILITY PER SECURITY ----- */
+
+    boolean existsByDoctorIdAndPatientId(UUID doctorId, UUID patientId);
+}
 
 
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionResponse.java
@@ -3368,6 +4128,79 @@ public class RabbitConfig {
                 .to(prescriptionExchange)
                 .with("#")
                 .noargs();
+    }
+}
+
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/SecurityConfig.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.mapping.SimpleAuthorityMapper;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.SecurityFilterChain;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    /** Converte il claim “role” del JWT in autorità Spring Security ROLE_… */
+    private JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter converter = new JwtGrantedAuthoritiesConverter();
+        converter.setAuthorityPrefix("ROLE_");
+        converter.setAuthoritiesClaimName("role");
+
+        JwtAuthenticationConverter jwtConv = new JwtAuthenticationConverter();
+        jwtConv.setJwtGrantedAuthoritiesConverter(converter);
+        return jwtConv;
+    }
+
+    @Bean
+    SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(reg -> reg
+                        .requestMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .oauth2ResourceServer(oauth -> oauth
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                )
+                .httpBasic(Customizer.withDefaults());
+
+        return http.build();
+    }
+
+    /**
+     * Definisce il bean JwtDecoder per firmare/verificare token HMAC‑SHA256
+     * usando la chiave fornita tramite property/env var “jwt.secret”.
+     */
+    @Bean
+    public JwtDecoder jwtDecoder(@Value("${jwt.secret:my_jwt_secret}") String secret) {
+        byte[] keyBytes;
+        try {
+            keyBytes = Base64.getDecoder().decode(secret);
+        } catch (IllegalArgumentException ex) {
+            keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        }
+        SecretKey key = new SecretKeySpec(keyBytes, "HmacSHA256");
+        return NimbusJwtDecoder.withSecretKey(key).build();
     }
 }
 

@@ -1,7 +1,8 @@
 package tassproject.authservice;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import jakarta.servlet.http.HttpServletResponse;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -22,26 +23,26 @@ import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import tassproject.authservice.repository.UserRepository;
 
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
+import javax.crypto.SecretKey;
 
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
-public class SecurityConfig {
+public class SecurityConfig implements WebMvcConfigurer {
 
-    /* === componenti custom ================================================= */
     private final UserRepository users;
     private final RestAuthenticationEntryPoint restEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 
-    /* === UserDetailsService =============================================== */
     @Bean
     public UserDetailsService userDetailsService() {
-        return username -> users.findByUsername(username.toLowerCase())
+        return username -> users
+                .findByUsername(username.toLowerCase())
                 .map(u -> org.springframework.security.core.userdetails.User
                         .withUsername(u.getUsername())
                         .password(u.getPassword())
@@ -51,13 +52,11 @@ public class SecurityConfig {
                         new UsernameNotFoundException("Utente non trovato: " + username));
     }
 
-    /* === Password encoder ================================================== */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /* === AuthenticationManager (DAO) ====================================== */
     @Bean
     public AuthenticationManager authenticationManager(UserDetailsService uds) {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
@@ -66,17 +65,25 @@ public class SecurityConfig {
         return new ProviderManager(provider);
     }
 
-    /* === JWT encoder / decoder ============================================ */
     @Bean
     public JwtEncoder jwtEncoder(@Value("${jwt.secret}") String secret) {
-        return new NimbusJwtEncoder(new ImmutableSecret<>(secret.getBytes(StandardCharsets.UTF_8)));
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT secret must be ≥ 256 bit (32 byte)");
+        }
+        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+        return new NimbusJwtEncoder(new ImmutableSecret<>(key));
     }
 
     @Bean
     public JwtDecoder jwtDecoder(@Value("${jwt.secret}") String secret) {
-        SecretKeySpec key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).build();
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT secret must be ≥ 256 bit (32 byte)");
+        }
+        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
 
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).build();
         OAuth2TokenValidator<Jwt> defaultVal   = JwtValidators.createDefault();
         OAuth2TokenValidator<Jwt> sessionValid = new SessionVersionValidator(users);
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaultVal, sessionValid));
@@ -84,26 +91,35 @@ public class SecurityConfig {
         return decoder;
     }
 
-    /* === Filtro di sicurezza principale =================================== */
+    /** Configura CORS per far passare l’header Authorization dal client */
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOrigins("http://localhost:3000")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("Authorization", "Content-Type")
+                .allowCredentials(true);
+    }
+
+    // **QUI LA VERSIONE CORRETTA**
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
-                                           AuthenticationManager authManager) throws Exception {
-
+                                           JwtDecoder jwtDecoder) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(req -> req
-                        .requestMatchers("/api/v1/auth/**", "/actuator/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/").permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/oauth2/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restEntryPoint)
-                        .accessDeniedHandler(restAccessDeniedHandler))
-                .authenticationManager(authManager)
-                .oauth2Login(oauth2 -> oauth2
-                        .successHandler(oAuth2LoginSuccessHandler))
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(Customizer.withDefaults()));
+                        .accessDeniedHandler(restAccessDeniedHandler)
+                )
+                .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2LoginSuccessHandler));
 
         return http.build();
     }

@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: dispensation-service
+
+# base‑url interno (default nel compose/network)
+prescription-service:
+  base-url: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}

@@ -62,5 +62,6 @@ HEALTHCHECK --interval=30s --timeout=2s \
 
 # Permette di passare opzioni JVM via env
 ENV JAVA_OPTS=""
+ENV JWT_SECRET=""
 
 ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar app.jar"]
