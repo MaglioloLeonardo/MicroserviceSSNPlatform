@@ -12,6 +12,7 @@ import javax.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 
 @Component
 public class JwtUtil {
@@ -35,24 +36,28 @@ public class JwtUtil {
         if (keyBytes.length < 32) {
             throw new IllegalStateException(
                     "Il JWT_SECRET configurato è troppo corto (" +
-                            (keyBytes.length * 8) + " bit). " +
-                            "Deve essere almeno 256 bit."
-            );
+                            (keyBytes.length * 8) + " bit). Deve essere almeno 256 bit.");
         }
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    /* ⇢ MODIFICATO: claim 'ver' ------------------------------------------------ */
+    /* ======= MODIFICATO: claim 'role' diventa LISTA ======= */
     public String generateToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getUsername())
-                .claim("ver", user.getSessionVersion())          // <—
+                .claim("ver", user.getSessionVersion())
+                /*  NUOVO: embed tutti i ruoli  */
+                .claim("role",
+                        user.getRoles()
+                                .stream()
+                                .map(RoleEntity::getName)
+                                .toList())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
-    /* ------------------------------------------------------------------------- */
+    /* ------------------------------------------------------ */
 
     public String getUsernameFromToken(String token) {
         return Jwts.parser()

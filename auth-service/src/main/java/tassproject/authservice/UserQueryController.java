@@ -13,11 +13,13 @@ public class UserQueryController {
 
     private final UserRepository users;
 
-    /* 8) ruoli associati ad un utente */
+    /* ---- ruoli associati all’utente ---- */
     @GetMapping("/{username}/roles")
-    public List<Role> roles(@PathVariable String username) {
+    public List<String> roles(@PathVariable String username) {
         return users.findByUsername(username.toLowerCase())
-                .map(u -> List.of(u.getRole()))
+                .map(u -> u.getRoles().stream()
+                        .map(RoleEntity::getName)
+                        .toList())
                 .orElse(List.of());
     }
 }

@@ -36,9 +36,10 @@ public class SecurityConfig implements WebMvcConfigurer {
 
     private final UserRepository users;
     private final RestAuthenticationEntryPoint restEntryPoint;
-    private final RestAccessDeniedHandler restAccessDeniedHandler;
-    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+    private final RestAccessDeniedHandler      restAccessDeniedHandler;
+    private final OAuth2LoginSuccessHandler    oAuth2LoginSuccessHandler;
 
+    /* -------- UserDetailsService: ruoli dal join‑table -------- */
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> users
@@ -46,11 +47,14 @@ public class SecurityConfig implements WebMvcConfigurer {
                 .map(u -> org.springframework.security.core.userdetails.User
                         .withUsername(u.getUsername())
                         .password(u.getPassword())
-                        .roles(u.getRole().name())
+                        .roles(u.getRoles().stream()
+                                .map(RoleEntity::getName)
+                                .toArray(String[]::new))
                         .build())
                 .orElseThrow(() ->
                         new UsernameNotFoundException("Utente non trovato: " + username));
     }
+
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -65,43 +69,38 @@ public class SecurityConfig implements WebMvcConfigurer {
         return new ProviderManager(provider);
     }
 
+    /* ---------- JWT (HMAC‑SHA256) ---------- */
     @Bean
     public JwtEncoder jwtEncoder(@Value("${jwt.secret}") String secret) {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
-        if (keyBytes.length < 32) {
-            throw new IllegalStateException("JWT secret must be ≥ 256 bit (32 byte)");
-        }
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+        SecretKey key   = Keys.hmacShaKeyFor(keyBytes);
         return new NimbusJwtEncoder(new ImmutableSecret<>(key));
     }
 
     @Bean
     public JwtDecoder jwtDecoder(@Value("${jwt.secret}") String secret) {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
-        if (keyBytes.length < 32) {
-            throw new IllegalStateException("JWT secret must be ≥ 256 bit (32 byte)");
-        }
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+        SecretKey key   = Keys.hmacShaKeyFor(keyBytes);
 
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).build();
-        OAuth2TokenValidator<Jwt> defaultVal   = JwtValidators.createDefault();
-        OAuth2TokenValidator<Jwt> sessionValid = new SessionVersionValidator(users);
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaultVal, sessionValid));
+        OAuth2TokenValidator<Jwt> defVal  = JwtValidators.createDefault();
+        OAuth2TokenValidator<Jwt> verVal  = new SessionVersionValidator(users);
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defVal, verVal));
 
         return decoder;
     }
 
-    /** Configura CORS per far passare l’header Authorization dal client */
+    /* ---------- CORS dev SPA ---------- */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
                 .allowedOrigins("http://localhost:3000")
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("Authorization", "Content-Type")
+                .allowedMethods("GET","POST","PUT","DELETE","OPTIONS")
+                .allowedHeaders("Authorization","Content-Type")
                 .allowCredentials(true);
     }
 
-    // **QUI LA VERSIONE CORRETTA**
+    /* ---------- Security filter‑chain ---------- */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            JwtDecoder jwtDecoder) throws Exception {
@@ -110,15 +109,16 @@ public class SecurityConfig implements WebMvcConfigurer {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(req -> req
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
+                        .requestMatchers("/api/v1/auth/login",
+                                "/api/v1/auth/register",
+                                "/oauth2/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restEntryPoint)
-                        .accessDeniedHandler(restAccessDeniedHandler)
-                )
+                        .accessDeniedHandler(restAccessDeniedHandler))
                 .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2LoginSuccessHandler));
 
         return http.build();

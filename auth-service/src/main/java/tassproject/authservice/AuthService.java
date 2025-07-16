@@ -4,33 +4,41 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tassproject.authservice.repository.RoleRepository;
 import tassproject.authservice.repository.UserRepository;
+
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository users;
+    private final RoleRepository roles;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
-    /* --------- REGISTER --------------------------------------------------- */
+    /* ------------------ REGISTER ------------------ */
     public AuthResponse register(RegisterRequest request) {
         String username = request.email().toLowerCase();
         if (users.findByUsername(username).isPresent())
             throw new IllegalArgumentException("Username già in uso");
 
+        RoleEntity roleEntity = roles.findByName(request.role().name())
+                .orElseThrow(() -> new IllegalStateException("Ruolo non trovato"));
+
         User user = new User(
                 username,
                 passwordEncoder.encode(request.password()),
-                request.role()
+                Set.of(roleEntity)
         );
         users.save(user);
+
         String token = jwtUtil.generateToken(user);
-        return new AuthResponse("Bearer", token);
+        return AuthResponse.bearer(token);
     }
 
-    /* --------- LOGIN ------------------------------------------------------ */
+    /* ------------------- LOGIN -------------------- */
     public AuthResponse login(LoginRequest request) {
         User user = users.findByUsername(request.email().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Credenziali non valide"));
@@ -38,20 +46,19 @@ public class AuthService {
         if (!passwordEncoder.matches(request.password(), user.getPassword()))
             throw new IllegalArgumentException("Credenziali non valide");
 
-        String token = jwtUtil.generateToken(user);
-        return new AuthResponse("Bearer", token);
+        return AuthResponse.bearer(jwtUtil.generateToken(user));
     }
 
-    /* --------- LOGOUT: invalida tutte le sessioni ------------------------- */
+    /* ------------------- LOGOUT ------------------- */
     @Transactional
     public void logout(String username) {
         users.findByUsername(username.toLowerCase()).ifPresent(u -> {
-            u.setSessionVersion(u.getSessionVersion() + 1);   // bump version
+            u.setSessionVersion(u.getSessionVersion() + 1);
             users.save(u);
         });
     }
 
-    /* --------- ME: info per login automatico ------------------------------ */
+    /* --------------------- ME --------------------- */
     public User me(String username) {
         return users.findByUsername(username.toLowerCase())
                 .orElseThrow(() -> new IllegalStateException("Utente non trovato"));

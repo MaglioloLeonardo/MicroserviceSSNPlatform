@@ -1,9 +1,11 @@
 package tassproject.authservice;
 
 import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", schema = "auth_service")
 public class User {
 
     @Id
@@ -16,38 +18,40 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
-
-    /* ⇢ NUOVO ⇠  --------------------------------------------- */
-    /** Versione della sessione.
-     *  Ogni logout incrementa questo valore; i JWT precedenti
-     *  (che portano una 'ver' più bassa) diventano invalidi. */
     @Column(name = "session_version", nullable = false)
     private Integer sessionVersion = 0;
-    /* -------------------------------------------------------- */
 
-    /* --- costruttori --------------------------------------- */
-    protected User() {}
+    /* ----------  NUOVO: ruoli M‑N  ---------- */
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "user_roles",
+            schema = "auth_service",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id"))
+    private Set<RoleEntity> roles = new HashSet<>();
+    /* ---------------------------------------- */
 
-    public User(String username, String password, Role role) {
+    protected User() { }
+
+    public User(String username, String password, Set<RoleEntity> roles) {
         this.username = username;
         this.password = password;
-        this.role     = role;
-        this.sessionVersion = 0;
+        this.roles    = roles;
     }
 
-    /* --- getters & setters -------------------------------- */
-    public Long getId()                     { return id; }
-    public String getUsername()             { return username; }
-    public String getPassword()             { return password; }
-    public Role getRole()                   { return role; }
-    public Integer getSessionVersion()      { return sessionVersion; }
+    /* ---------- getters & setters ---------- */
+    public Long              getId()              { return id; }
+    public void              setId(Long id)       { this.id = id; }
 
-    public void setId(Long id)                  { this.id = id; }
-    public void setUsername(String username)    { this.username = username; }
-    public void setPassword(String password)    { this.password = password; }
-    public void setRole(Role role)              { this.role = role; }
-    public void setSessionVersion(Integer ver)  { this.sessionVersion = ver; }
+    public String            getUsername()        { return username; }
+    public void              setUsername(String u){ this.username = u; }
+
+    public String            getPassword()        { return password; }
+    public void              setPassword(String p){ this.password = p; }
+
+    public Integer           getSessionVersion()  { return sessionVersion; }
+    public void              setSessionVersion(Integer v){ this.sessionVersion = v; }
+
+    public Set<RoleEntity>   getRoles()           { return roles; }
+    public void              setRoles(Set<RoleEntity> r){ this.roles = r; }
 }
