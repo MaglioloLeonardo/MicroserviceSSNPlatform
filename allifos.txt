@@ -606,33 +606,41 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tassproject.authservice.repository.RoleRepository;
 import tassproject.authservice.repository.UserRepository;
+
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository users;
+    private final RoleRepository roles;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
-    /* --------- REGISTER --------------------------------------------------- */
+    /* ------------------ REGISTER ------------------ */
     public AuthResponse register(RegisterRequest request) {
         String username = request.email().toLowerCase();
         if (users.findByUsername(username).isPresent())
             throw new IllegalArgumentException("Username già in uso");
 
+        RoleEntity roleEntity = roles.findByName(request.role().name())
+                .orElseThrow(() -> new IllegalStateException("Ruolo non trovato"));
+
         User user = new User(
                 username,
                 passwordEncoder.encode(request.password()),
-                request.role()
+                Set.of(roleEntity)
         );
         users.save(user);
+
         String token = jwtUtil.generateToken(user);
-        return new AuthResponse("Bearer", token);
+        return AuthResponse.bearer(token);
     }
 
-    /* --------- LOGIN ------------------------------------------------------ */
+    /* ------------------- LOGIN -------------------- */
     public AuthResponse login(LoginRequest request) {
         User user = users.findByUsername(request.email().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Credenziali non valide"));
@@ -640,20 +648,19 @@ public class AuthService {
         if (!passwordEncoder.matches(request.password(), user.getPassword()))
             throw new IllegalArgumentException("Credenziali non valide");
 
-        String token = jwtUtil.generateToken(user);
-        return new AuthResponse("Bearer", token);
+        return AuthResponse.bearer(jwtUtil.generateToken(user));
     }
 
-    /* --------- LOGOUT: invalida tutte le sessioni ------------------------- */
+    /* ------------------- LOGOUT ------------------- */
     @Transactional
     public void logout(String username) {
         users.findByUsername(username.toLowerCase()).ifPresent(u -> {
-            u.setSessionVersion(u.getSessionVersion() + 1);   // bump version
+            u.setSessionVersion(u.getSessionVersion() + 1);
             users.save(u);
         });
     }
 
-    /* --------- ME: info per login automatico ------------------------------ */
+    /* --------------------- ME --------------------- */
     public User me(String username) {
         return users.findByUsername(username.toLowerCase())
                 .orElseThrow(() -> new IllegalStateException("Utente non trovato"));
@@ -772,6 +779,7 @@ import javax.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 
 @Component
 public class JwtUtil {
@@ -795,24 +803,28 @@ public class JwtUtil {
         if (keyBytes.length < 32) {
             throw new IllegalStateException(
                     "Il JWT_SECRET configurato è troppo corto (" +
-                            (keyBytes.length * 8) + " bit). " +
-                            "Deve essere almeno 256 bit."
-            );
+                            (keyBytes.length * 8) + " bit). Deve essere almeno 256 bit.");
         }
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    /* ⇢ MODIFICATO: claim 'ver' ------------------------------------------------ */
+    /* ======= MODIFICATO: claim 'role' diventa LISTA ======= */
     public String generateToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getUsername())
-                .claim("ver", user.getSessionVersion())          // <—
+                .claim("ver", user.getSessionVersion())
+                /*  NUOVO: embed tutti i ruoli  */
+                .claim("role",
+                        user.getRoles()
+                                .stream()
+                                .map(RoleEntity::getName)
+                                .toList())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
-    /* ------------------------------------------------------------------------- */
+    /* ------------------------------------------------------ */
 
     public String getUsernameFromToken(String token) {
         return Jwts.parser()
@@ -847,6 +859,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import tassproject.authservice.repository.RoleRepository;
 import tassproject.authservice.repository.UserRepository;
 
 import jakarta.servlet.ServletException;
@@ -855,12 +868,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
 public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final JwtUtil jwtUtil;
 
     @Override
@@ -869,49 +884,38 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                                         Authentication authentication)
             throws IOException, ServletException {
 
-        // 1) Estrai l’OAuth2User e la sua email
+        /* -------- 1) estrai e‑mail -------- */
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
         String email = oAuth2User.getAttribute("email");
 
-        // 2) Se Google non ci fornisce l’email, rimandiamo 401 con JSON di errore
         if (email == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             new ObjectMapper().writeValue(response.getWriter(),
-                    Map.of(
-                            "error", "Unauthorized",
-                            "message", "No email provided by Google"
-                    )
-            );
+                    Map.of("error", "Unauthorized", "message", "No email provided by Google"));
             return;
         }
 
-        // 3) Trova o crea l’utente locale
+        /* -------- 2) trova ruolo PATIENT -------- */
+        RoleEntity patientRole = roleRepository.findByName("PATIENT")
+                .orElseThrow(() -> new IllegalStateException("Ruolo PATIENT mancante a DB"));
+
+        /* -------- 3) upsert utente -------- */
         User user = userRepository.findByUsername(email.toLowerCase())
-                .orElseGet(() -> {
-                    User u = new User(
-                            email.toLowerCase(),
-                            "",            // password vuota perché non useremo il form-login
-                            Role.PATIENT   // ruolo di default
-                    );
-                    return userRepository.save(u);
-                });
+                .orElseGet(() -> userRepository.save(
+                        new User(email.toLowerCase(), "", Set.of(patientRole))
+                ));
 
-        // 4) Genera il JWT
+        /* -------- 4) JWT + cookie -------- */
         String jwt = jwtUtil.generateToken(user);
+        Cookie cookie = new Cookie("access_token", jwt);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(request.isSecure());
+        cookie.setPath("/");
+        cookie.setMaxAge(60 * 60);
+        response.addCookie(cookie);
 
-        // 5) Imposta il JWT in un cookie HttpOnly
-        Cookie jwtCookie = new Cookie("access_token", jwt);
-        jwtCookie.setHttpOnly(true);
-        jwtCookie.setSecure(request.isSecure());
-        jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(60 * 60); // 1 ora
-        // Se servisse cross-site:
-        // jwtCookie.setSecure(true);
-        // jwtCookie.setSameSite("None");
-        response.addCookie(jwtCookie);
-
-        // 6) Redirect diretto al frontend per la selezione del ruolo
+        /* -------- 5) redirect -------- */
         response.sendRedirect("http://localhost:3000/seleziona-ruolo");
     }
 }
@@ -1099,9 +1103,55 @@ package tassproject.authservice;
 
 public enum Role {
     PATIENT,
-    MEDICO,
-    FARMACISTA,
-    SSN_ADMIN
+    DOCTOR,
+    PHARMACIST,
+    ADMIN
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/RoleEntity.java
+----------------------------------------
+package tassproject.authservice;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "roles", schema = "auth_service")
+public class RoleEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @Column(nullable = false, unique = true)
+    private String name;
+
+    protected RoleEntity() { }
+
+    public RoleEntity(String name) {
+        this.name = name;
+    }
+
+    /* ---------- getters & setters ---------- */
+    public Integer getId()            { return id; }
+    public void    setId(Integer id)  { this.id = id; }
+
+    public String  getName()          { return name; }
+    public void    setName(String n)  { this.name = n; }
+}
+
+
+### File: auth-service/src/main/java/tassproject/authservice/RoleRepository.java
+----------------------------------------
+package tassproject.authservice.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.authservice.RoleEntity;
+
+import java.util.Optional;
+
+public interface RoleRepository extends JpaRepository<RoleEntity, Integer> {
+    Optional<RoleEntity> findByName(String name);
 }
 
 
@@ -1145,9 +1195,10 @@ public class SecurityConfig implements WebMvcConfigurer {
 
     private final UserRepository users;
     private final RestAuthenticationEntryPoint restEntryPoint;
-    private final RestAccessDeniedHandler restAccessDeniedHandler;
-    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+    private final RestAccessDeniedHandler      restAccessDeniedHandler;
+    private final OAuth2LoginSuccessHandler    oAuth2LoginSuccessHandler;
 
+    /* -------- UserDetailsService: ruoli dal join‑table -------- */
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> users
@@ -1155,11 +1206,14 @@ public class SecurityConfig implements WebMvcConfigurer {
                 .map(u -> org.springframework.security.core.userdetails.User
                         .withUsername(u.getUsername())
                         .password(u.getPassword())
-                        .roles(u.getRole().name())
+                        .roles(u.getRoles().stream()
+                                .map(RoleEntity::getName)
+                                .toArray(String[]::new))
                         .build())
                 .orElseThrow(() ->
                         new UsernameNotFoundException("Utente non trovato: " + username));
     }
+
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -1174,43 +1228,38 @@ public class SecurityConfig implements WebMvcConfigurer {
         return new ProviderManager(provider);
     }
 
+    /* ---------- JWT (HMAC‑SHA256) ---------- */
     @Bean
     public JwtEncoder jwtEncoder(@Value("${jwt.secret}") String secret) {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
-        if (keyBytes.length < 32) {
-            throw new IllegalStateException("JWT secret must be ≥ 256 bit (32 byte)");
-        }
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+        SecretKey key   = Keys.hmacShaKeyFor(keyBytes);
         return new NimbusJwtEncoder(new ImmutableSecret<>(key));
     }
 
     @Bean
     public JwtDecoder jwtDecoder(@Value("${jwt.secret}") String secret) {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
-        if (keyBytes.length < 32) {
-            throw new IllegalStateException("JWT secret must be ≥ 256 bit (32 byte)");
-        }
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+        SecretKey key   = Keys.hmacShaKeyFor(keyBytes);
 
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).build();
-        OAuth2TokenValidator<Jwt> defaultVal   = JwtValidators.createDefault();
-        OAuth2TokenValidator<Jwt> sessionValid = new SessionVersionValidator(users);
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaultVal, sessionValid));
+        OAuth2TokenValidator<Jwt> defVal  = JwtValidators.createDefault();
+        OAuth2TokenValidator<Jwt> verVal  = new SessionVersionValidator(users);
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defVal, verVal));
 
         return decoder;
     }
 
-    /** Configura CORS per far passare l’header Authorization dal client */
+    /* ---------- CORS dev SPA ---------- */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
                 .allowedOrigins("http://localhost:3000")
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("Authorization", "Content-Type")
+                .allowedMethods("GET","POST","PUT","DELETE","OPTIONS")
+                .allowedHeaders("Authorization","Content-Type")
                 .allowCredentials(true);
     }
 
-    // **QUI LA VERSIONE CORRETTA**
+    /* ---------- Security filter‑chain ---------- */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            JwtDecoder jwtDecoder) throws Exception {
@@ -1219,15 +1268,16 @@ public class SecurityConfig implements WebMvcConfigurer {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(req -> req
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
+                        .requestMatchers("/api/v1/auth/login",
+                                "/api/v1/auth/register",
+                                "/oauth2/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restEntryPoint)
-                        .accessDeniedHandler(restAccessDeniedHandler)
-                )
+                        .accessDeniedHandler(restAccessDeniedHandler))
                 .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2LoginSuccessHandler));
 
         return http.build();
@@ -1287,9 +1337,11 @@ public class SessionVersionValidator implements OAuth2TokenValidator<Jwt> {
 package tassproject.authservice;
 
 import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", schema = "auth_service")
 public class User {
 
     @Id
@@ -1302,40 +1354,42 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
-
-    /* ⇢ NUOVO ⇠  --------------------------------------------- */
-    /** Versione della sessione.
-     *  Ogni logout incrementa questo valore; i JWT precedenti
-     *  (che portano una 'ver' più bassa) diventano invalidi. */
     @Column(name = "session_version", nullable = false)
     private Integer sessionVersion = 0;
-    /* -------------------------------------------------------- */
 
-    /* --- costruttori --------------------------------------- */
-    protected User() {}
+    /* ----------  NUOVO: ruoli M‑N  ---------- */
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "user_roles",
+            schema = "auth_service",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id"))
+    private Set<RoleEntity> roles = new HashSet<>();
+    /* ---------------------------------------- */
 
-    public User(String username, String password, Role role) {
+    protected User() { }
+
+    public User(String username, String password, Set<RoleEntity> roles) {
         this.username = username;
         this.password = password;
-        this.role     = role;
-        this.sessionVersion = 0;
+        this.roles    = roles;
     }
 
-    /* --- getters & setters -------------------------------- */
-    public Long getId()                     { return id; }
-    public String getUsername()             { return username; }
-    public String getPassword()             { return password; }
-    public Role getRole()                   { return role; }
-    public Integer getSessionVersion()      { return sessionVersion; }
+    /* ---------- getters & setters ---------- */
+    public Long              getId()              { return id; }
+    public void              setId(Long id)       { this.id = id; }
 
-    public void setId(Long id)                  { this.id = id; }
-    public void setUsername(String username)    { this.username = username; }
-    public void setPassword(String password)    { this.password = password; }
-    public void setRole(Role role)              { this.role = role; }
-    public void setSessionVersion(Integer ver)  { this.sessionVersion = ver; }
+    public String            getUsername()        { return username; }
+    public void              setUsername(String u){ this.username = u; }
+
+    public String            getPassword()        { return password; }
+    public void              setPassword(String p){ this.password = p; }
+
+    public Integer           getSessionVersion()  { return sessionVersion; }
+    public void              setSessionVersion(Integer v){ this.sessionVersion = v; }
+
+    public Set<RoleEntity>   getRoles()           { return roles; }
+    public void              setRoles(Set<RoleEntity> r){ this.roles = r; }
 }
 
 
@@ -1356,11 +1410,13 @@ public class UserQueryController {
 
     private final UserRepository users;
 
-    /* 8) ruoli associati ad un utente */
+    /* ---- ruoli associati all’utente ---- */
     @GetMapping("/{username}/roles")
-    public List<Role> roles(@PathVariable String username) {
+    public List<String> roles(@PathVariable String username) {
         return users.findByUsername(username.toLowerCase())
-                .map(u -> List.of(u.getRole()))
+                .map(u -> u.getRoles().stream()
+                        .map(RoleEntity::getName)
+                        .toList())
                 .orElse(List.of());
     }
 }

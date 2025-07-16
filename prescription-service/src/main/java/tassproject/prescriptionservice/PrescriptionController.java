@@ -3,26 +3,29 @@ package tassproject.prescriptionservice;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import tassproject.prescriptionservice.AuthorizationService;
+import tassproject.prescriptionservice.CitizenDTO;
+import tassproject.prescriptionservice.CitizenClient;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1")
 public class PrescriptionController {
 
     private final PrescriptionApplicationService service;
-    private final AuthorizationService authz;
+    private final AuthorizationService            authz;
+    private final CitizenClient                   citizens;   // 🆕
 
     public PrescriptionController(PrescriptionApplicationService service,
-                                  AuthorizationService authz) {
-        this.service = service;
-        this.authz   = authz;
+                                  AuthorizationService authz,
+                                  CitizenClient citizens) {   // 🆕
+        this.service  = service;
+        this.authz    = authz;
+        this.citizens = citizens;
     }
 
     /* ------------------------------ CRUD ESISTENTI -------------------- */
-
     @PostMapping("/prescriptions")
     @ResponseStatus(HttpStatus.CREATED)
     public PrescriptionResponse create(@Valid @RequestBody CreatePrescriptionRequest request) {
@@ -53,8 +56,7 @@ public class PrescriptionController {
         return service.updateStatus(id, body.newStatus());
     }
 
-    /* ------------------------------ NUOVI ENDPOINT -------------------- */
-
+    /* ------------------------------ QUERY UUID ----------------------- */
     @GetMapping("/doctors/{doctorId}/patients")
     public List<UUID> patientsOfDoctor(@PathVariable UUID doctorId) {
         authz.assertCanAccessDoctor(doctorId);
@@ -77,5 +79,15 @@ public class PrescriptionController {
     public List<UUID> drugsByPatient(@PathVariable UUID patientId) {
         authz.assertCanAccessPatient(patientId);
         return service.getDrugIdsByPatient(patientId);
+    }
+
+    /* ----------------------- NUOVO: DETTAGLI PAZIENTI ---------------- */
+    @GetMapping("/doctors/{doctorId}/patients/details")
+    public List<CitizenDTO> patientDetails(@PathVariable UUID doctorId) {
+        authz.assertCanAccessDoctor(doctorId);
+        return service.getPatientsByDoctor(doctorId).stream()
+                .map(citizens::findById)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 }
