@@ -11,13 +11,13 @@ RUN chmod +x mvnw
 COPY pom.xml      pom.xml
 
 # 2️⃣ Copio tutti i moduli del multi-module
-COPY common/                 common/
 COPY api-gateway/            api-gateway/
 COPY dispensation-service/   dispensation-service/
 COPY inventory-service/      inventory-service/
 COPY notification-service/   notification-service/
 COPY prescription-service/   prescription-service/
 COPY auth-service/           auth-service/
+COPY pharma-service/         pharma-service/
 
 # 3️⃣ “Fake” go-offline per scaldare la cache dei dependency layer
 RUN ./mvnw -B -ntp dependency:go-offline

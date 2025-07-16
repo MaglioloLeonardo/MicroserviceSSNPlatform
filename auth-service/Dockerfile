@@ -11,25 +11,26 @@ RUN chmod +x mvnw
 COPY pom.xml         pom.xml
 
 # 2️⃣ Copio i POM di tutti i moduli per prime dipendenze
-COPY common/pom.xml               common/pom.xml
 COPY api-gateway/pom.xml          api-gateway/pom.xml
 COPY dispensation-service/pom.xml dispensation-service/pom.xml
 COPY inventory-service/pom.xml    inventory-service/pom.xml
 COPY notification-service/pom.xml notification-service/pom.xml
 COPY prescription-service/pom.xml prescription-service/pom.xml
 COPY auth-service/pom.xml         auth-service/pom.xml
+COPY pharma-service/pom.xml         pharma-service/pom.xml
+
 
 # Scarico tutte le dipendenze in anticipo
 RUN ./mvnw -B dependency:go-offline
 
 # 3️⃣ Copio l’intero sorgente
-COPY common                 common
 COPY api-gateway            api-gateway
 COPY dispensation-service   dispensation-service
 COPY inventory-service      inventory-service
 COPY notification-service   notification-service
 COPY prescription-service   prescription-service
 COPY auth-service/          auth-service/
+COPY pharma-service/         pharma-service/
 
 # 4️⃣ Compilo solo auth-service (+ dipendenze interne) e skippo i test
 RUN ./mvnw -B clean package \
