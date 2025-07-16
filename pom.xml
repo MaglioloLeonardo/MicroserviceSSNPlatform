@@ -125,9 +125,9 @@
 
     <!-- 6) Moduli figli -->
     <modules>
-        <module>common</module>
         <module>api-gateway</module>
         <module>prescription-service</module>
+        <module>pharma-service</module>
         <module>dispensation-service</module>
         <module>inventory-service</module>
         <module>notification-service</module>

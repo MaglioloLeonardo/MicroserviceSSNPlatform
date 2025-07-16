@@ -8,7 +8,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import tassproject.inventoryservice.repository.InventoryItemRepository;
+import tassproject.inventoryservice.InventoryItemRepository;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
