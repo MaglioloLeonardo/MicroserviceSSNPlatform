@@ -2,7 +2,7 @@ package tassproject.authservice;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import tassproject.authservice.repository.UserRepository;
+import tassproject.authservice.UserRepository;
 
 import java.util.List;
 

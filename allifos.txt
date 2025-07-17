@@ -720,49 +720,91 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tassproject.authservice.repository.RoleRepository;
-import tassproject.authservice.repository.UserRepository;
+import tassproject.authservice.Citizen;
+import tassproject.authservice.CitizenRepository;
+import tassproject.authservice.RoleRepository;
+import tassproject.authservice.repository.UserProfileRepository;
+import tassproject.authservice.UserRepository;
 
+import java.util.Date;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final UserRepository users;
-    private final RoleRepository roles;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
+    private final UserRepository         users;
+    private final RoleRepository         roles;
+    private final CitizenRepository      citizens;
+    private final UserProfileRepository  profiles;
+    private final PasswordEncoder        passwordEncoder;
+    private final JwtUtil                jwtUtil;
 
     /* ------------------ REGISTER ------------------ */
-    public AuthResponse register(RegisterRequest request) {
-        String username = request.email().toLowerCase();
-        if (users.findByUsername(username).isPresent())
+    @Transactional
+    public AuthResponse register(RegisterRequest req) {
+        String username = req.email().toLowerCase();
+        if (users.findByUsername(username).isPresent()) {
             throw new IllegalArgumentException("Username già in uso");
+        }
+        if (citizens.existsByCf(req.cf())) {
+            throw new IllegalArgumentException("CF già presente");
+        }
 
-        RoleEntity roleEntity = roles.findByName(request.role().name())
+        // 1) Salva cittadino
+        UUID cid = UUID.randomUUID();
+        String tipoUtente = switch (req.role()) {
+            case PATIENT    -> "PAZIENTE";
+            case DOCTOR     -> "MEDICO";
+            case PHARMACIST -> "FARMACISTA";
+            case ADMIN      -> "ADMIN";
+        };
+        Citizen citizen = new Citizen(
+                cid,
+                req.cf(),
+                req.nome(),
+                req.cognome(),
+                req.dataNascita(),
+                req.luogoNascita(),
+                req.cittaResidenza(),
+                tipoUtente
+        );
+        citizens.save(citizen);
+
+        // 2) Salva user & ruolo
+        RoleEntity roleEnt = roles.findByName(req.role().name())
                 .orElseThrow(() -> new IllegalStateException("Ruolo non trovato"));
-
         User user = new User(
                 username,
-                passwordEncoder.encode(request.password()),
-                Set.of(roleEntity)
+                passwordEncoder.encode(req.password()),
+                Set.of(roleEnt)
         );
         users.save(user);
 
-        String token = jwtUtil.generateToken(user);
-        return AuthResponse.bearer(token);
+        // 3) Mappa user ↔ citizen
+        profiles.save(new UserProfile(user.getId(), cid));
+
+        // 4) JWT completo di citizen_id
+        return AuthResponse.bearer(jwtUtil.generateToken(user, cid));
     }
 
     /* ------------------- LOGIN -------------------- */
-    public AuthResponse login(LoginRequest request) {
-        User user = users.findByUsername(request.email().toLowerCase())
+    public AuthResponse login(LoginRequest req) {
+        User user = users.findByUsername(req.email().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Credenziali non valide"));
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword()))
+        if (!passwordEncoder.matches(req.password(), user.getPassword())) {
             throw new IllegalArgumentException("Credenziali non valide");
+        }
 
-        return AuthResponse.bearer(jwtUtil.generateToken(user));
+        // Recupera il citizenId dal mapping (usando findById)
+        UUID citizenId = profiles.findById(user.getId())
+                .map(UserProfile::getCitizenId)
+                .orElseThrow(() -> new IllegalStateException("Profilo utente mancante"));
+
+        return AuthResponse.bearer(jwtUtil.generateToken(user, citizenId));
     }
 
     /* ------------------- LOGOUT ------------------- */
@@ -796,6 +838,102 @@ public class AuthServiceApplication {
     }
 }
 
+
+### File: auth-service/src/main/java/tassproject/authservice/Citizen.java
+----------------------------------------
+package tassproject.authservice;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Entity
+@Table(name = "citizens", schema = "anagrafica_service")
+public class Citizen {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    @Column(nullable = false, unique = true, length = 16)
+    private String cf;
+
+    @Column(nullable = false, length = 100)
+    private String nome;
+
+    @Column(nullable = false, length = 100)
+    private String cognome;
+
+    @Column(name = "data_nascita", nullable = false)
+    private LocalDate dataNascita;
+
+    @Column(name = "luogo_nascita", length = 100)
+    private String luogoNascita;
+
+    @Column(name = "citta_residenza", length = 100)
+    private String cittaResidenza;
+
+    @Column(name = "tipo_utente", nullable = false, length = 16)
+    private String tipoUtente;
+
+    protected Citizen() {}
+
+    public Citizen(UUID id,
+                   String cf,
+                   String nome,
+                   String cognome,
+                   LocalDate dataNascita,
+                   String luogoNascita,
+                   String cittaResidenza,
+                   String tipoUtente) {
+        this.id             = id;
+        this.cf             = cf;
+        this.nome           = nome;
+        this.cognome        = cognome;
+        this.dataNascita    = dataNascita;
+        this.luogoNascita   = luogoNascita;
+        this.cittaResidenza = cittaResidenza;
+        this.tipoUtente     = tipoUtente;
+    }
+
+    /* -------- getters & setters ------- */
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public String getCf() { return cf; }
+    public void setCf(String cf) { this.cf = cf; }
+
+    public String getNome() { return nome; }
+    public void setNome(String nome) { this.nome = nome; }
+
+    public String getCognome() { return cognome; }
+    public void setCognome(String cognome) { this.cognome = cognome; }
+
+    public LocalDate getDataNascita() { return dataNascita; }
+    public void setDataNascita(LocalDate dataNascita) { this.dataNascita = dataNascita; }
+
+    public String getLuogoNascita() { return luogoNascita; }
+    public void setLuogoNascita(String luogoNascita) { this.luogoNascita = luogoNascita; }
+
+    public String getCittaResidenza() { return cittaResidenza; }
+    public void setCittaResidenza(String cittaResidenza) { this.cittaResidenza = cittaResidenza; }
+
+    public String getTipoUtente() { return tipoUtente; }
+    public void setTipoUtente(String tipoUtente) { this.tipoUtente = tipoUtente; }
+}
+
+### File: auth-service/src/main/java/tassproject/authservice/CitizenRepository.java
+----------------------------------------
+package tassproject.authservice;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.authservice.Citizen;
+
+import java.util.UUID;
+
+public interface CitizenRepository extends JpaRepository<Citizen, UUID> {
+    boolean existsByCf(String cf);
+}
 
 ### File: auth-service/src/main/java/tassproject/authservice/GlobalCorsConfig.java
 ----------------------------------------
@@ -894,6 +1032,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 public class JwtUtil {
@@ -922,23 +1061,31 @@ public class JwtUtil {
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    /* ======= MODIFICATO: claim 'role' diventa LISTA ======= */
-    public String generateToken(User user) {
-        return Jwts.builder()
+    /**
+     * Nuovo overload che include il claim "citizen_id".
+     */
+    public String generateToken(User user, UUID citizenId) {
+        var builder = Jwts.builder()
                 .setSubject(user.getUsername())
                 .claim("ver", user.getSessionVersion())
-                /*  NUOVO: embed tutti i ruoli  */
-                .claim("role",
-                        user.getRoles()
-                                .stream()
-                                .map(RoleEntity::getName)
-                                .toList())
+                .claim("role", user.getRoles().stream()
+                        .map(RoleEntity::getName)
+                        .toList())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs));
+
+        if (citizenId != null) {
+            builder.claim("citizen_id", citizenId.toString());
+        }
+        return builder.signWith(key, SignatureAlgorithm.HS256).compact();
     }
-    /* ------------------------------------------------------ */
+
+    /**
+     * Metodo legacy (es. OAuth2 login) ‒ genera comunque un token ma **senza** citizen_id.
+     */
+    public String generateToken(User user) {
+        return generateToken(user, null);
+    }
 
     public String getUsernameFromToken(String token) {
         return Jwts.parser()
@@ -948,6 +1095,8 @@ public class JwtUtil {
                 .getPayload()
                 .getSubject();
     }
+
+
 }
 
 
@@ -973,8 +1122,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
-import tassproject.authservice.repository.RoleRepository;
-import tassproject.authservice.repository.UserRepository;
+import tassproject.authservice.RoleRepository;
+import tassproject.authservice.UserRepository;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -1092,13 +1241,22 @@ package tassproject.authservice;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import tassproject.authservice.Role;
+import jakarta.validation.constraints.Past;
+import java.time.LocalDate;
 
 public record RegisterRequest(
+        /* Credenziali */
         @NotBlank @Email String email,
-        @NotBlank String password,
-        @NotNull Role role) {}
-
+        @NotBlank           String password,
+        @NotNull            Role   role,
+        /* Campi anagrafica */
+        @NotBlank String  cf,
+        @NotBlank String  nome,
+        @NotBlank String  cognome,
+        @Past     LocalDate dataNascita,
+        @NotBlank String  luogoNascita,
+        @NotBlank String  cittaResidenza
+) {}
 
 ### File: auth-service/src/main/java/tassproject/authservice/ResourceServerConfig.java
 ----------------------------------------
@@ -1257,7 +1415,7 @@ public class RoleEntity {
 
 ### File: auth-service/src/main/java/tassproject/authservice/RoleRepository.java
 ----------------------------------------
-package tassproject.authservice.repository;
+package tassproject.authservice;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import tassproject.authservice.RoleEntity;
@@ -1298,7 +1456,7 @@ import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-import tassproject.authservice.repository.UserRepository;
+import tassproject.authservice.UserRepository;
 
 import javax.crypto.SecretKey;
 
@@ -1407,7 +1565,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
-import tassproject.authservice.repository.UserRepository;
+import tassproject.authservice.UserRepository;
 
 /**
  * Rifiuta i JWT la cui 'ver' non coincide con la sessionVersion salvata a DB.
@@ -1507,13 +1665,53 @@ public class User {
 }
 
 
+### File: auth-service/src/main/java/tassproject/authservice/UserProfile.java
+----------------------------------------
+package tassproject.authservice;
+
+import jakarta.persistence.*;
+import java.util.UUID;
+
+@Entity
+@Table(name = "user_profiles", schema = "auth_service")
+public class UserProfile {
+
+    @Id
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(name = "citizen_id", nullable = false, columnDefinition = "uuid", unique = true)
+    private UUID citizenId;
+
+    protected UserProfile() {}
+
+    public UserProfile(Long userId, UUID citizenId) {
+        this.userId    = userId;
+        this.citizenId = citizenId;
+    }
+
+    /* getters */
+    public Long getUserId()   { return userId;   }
+    public UUID getCitizenId(){ return citizenId;}
+}
+
+### File: auth-service/src/main/java/tassproject/authservice/UserProfileRepository.java
+----------------------------------------
+package tassproject.authservice.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.authservice.UserProfile;
+
+public interface UserProfileRepository extends JpaRepository<UserProfile, Long> {
+}
+
 ### File: auth-service/src/main/java/tassproject/authservice/UserQueryController.java
 ----------------------------------------
 package tassproject.authservice;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import tassproject.authservice.repository.UserRepository;
+import tassproject.authservice.UserRepository;
 
 import java.util.List;
 
@@ -1538,7 +1736,7 @@ public class UserQueryController {
 
 ### File: auth-service/src/main/java/tassproject/authservice/UserRepository.java
 ----------------------------------------
-package tassproject.authservice.repository;
+package tassproject.authservice;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import tassproject.authservice.User;
@@ -2491,7 +2689,7 @@ class DispensationServiceApplicationTests {
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Flyway (🆕 per gestire la rimozione del vecchio FK) -->
+
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
@@ -2848,7 +3046,41 @@ public record ReserveInventoryRequest(
 
 ### File: inventory-service/src/main/resources/application.properties
 ----------------------------------------
-<<ERROR reading file: 'utf-8' codec can't decode byte 0xec in position 662: invalid continuation byte>>
+spring.application.name=inventory-service
+server.port=${SERVER_PORT:8080}
+
+
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+
+spring.flyway.enabled=true
+spring.flyway.baseline-on-migrate=true
+spring.flyway.baseline-version=0
+spring.flyway.schemas=inventory_service
+
+spring.flyway.locations=classpath:db/migration
+
+
+
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.default_schema=inventory_service
+
+
+management.endpoints.web.exposure.include=health,info
+
+
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=600000
+
+
+jwt.secret=${JWT_SECRET:my_jwt_secret}
+jwt.expiration=${JWT_EXPIRATION_MS:3600000}
 
 
 ### File: inventory-service/src/main/resources/db/migration/V1__drop_inventory_items_drug_fk.sql
@@ -3306,6 +3538,10 @@ class NotificationServiceApplicationTests {
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-oauth2-jose</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
     </dependencies>
 
     <!-- 5) Plugin di build -->
@@ -3701,27 +3937,44 @@ package tassproject.pharmaservice;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.beans.factory.annotation.Value;
+
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableWebFluxSecurity
-@EnableMethodSecurity
 public class SecurityConfig {
+
+
+    @Bean
+    public ReactiveJwtDecoder reactiveJwtDecoder(@Value("${jwt.secret}") String secret) {
+        // Use NimbusReactiveJwtDecoder with symmetric key
+        SecretKey key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HMACSHA256");
+        return NimbusReactiveJwtDecoder.withSecretKey(key).build();
+    }
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        return http
-                .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .authorizeExchange(ex -> ex
-                        .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
-                        .anyExchange().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
-                .build();
+        http
+                .authorizeExchange(exchanges -> exchanges
+                        .pathMatchers("/actuator/health").permitAll()
+                        .anyExchange().authenticated()
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwtSpec -> jwtSpec.jwtDecoder(reactiveJwtDecoder(null)))
+                );
+        return http.build();
     }
 }
+
 
 ### File: pharma-service/src/main/resources/application.properties
 ----------------------------------------

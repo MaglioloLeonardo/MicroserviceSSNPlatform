@@ -25,7 +25,7 @@ import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-import tassproject.authservice.repository.UserRepository;
+import tassproject.authservice.UserRepository;
 
 import javax.crypto.SecretKey;
 

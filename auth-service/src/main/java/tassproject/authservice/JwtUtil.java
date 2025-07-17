@@ -13,6 +13,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 public class JwtUtil {
@@ -41,23 +42,31 @@ public class JwtUtil {
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    /* ======= MODIFICATO: claim 'role' diventa LISTA ======= */
-    public String generateToken(User user) {
-        return Jwts.builder()
+    /**
+     * Nuovo overload che include il claim "citizen_id".
+     */
+    public String generateToken(User user, UUID citizenId) {
+        var builder = Jwts.builder()
                 .setSubject(user.getUsername())
                 .claim("ver", user.getSessionVersion())
-                /*  NUOVO: embed tutti i ruoli  */
-                .claim("role",
-                        user.getRoles()
-                                .stream()
-                                .map(RoleEntity::getName)
-                                .toList())
+                .claim("role", user.getRoles().stream()
+                        .map(RoleEntity::getName)
+                        .toList())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs));
+
+        if (citizenId != null) {
+            builder.claim("citizen_id", citizenId.toString());
+        }
+        return builder.signWith(key, SignatureAlgorithm.HS256).compact();
     }
-    /* ------------------------------------------------------ */
+
+    /**
+     * Metodo legacy (es. OAuth2 login) ‒ genera comunque un token ma **senza** citizen_id.
+     */
+    public String generateToken(User user) {
+        return generateToken(user, null);
+    }
 
     public String getUsernameFromToken(String token) {
         return Jwts.parser()
@@ -67,4 +76,6 @@ public class JwtUtil {
                 .getPayload()
                 .getSubject();
     }
+
+
 }

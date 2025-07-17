@@ -4,7 +4,7 @@
 @invPort = 8083
 @pharmaPort = 8086
 
-@doctorId       = 10000000-0000-0000-0000-000000000001
+@doctorId       = c9205454-02a3-4712-bb2f-067334af2d05
 @patientId      = 20000000-0000-0000-0000-000000000001
 @pharmacistId   = 30000000-0000-0000-0000-000000000001
 @pharmacyId     = 40000000-0000-0000-0000-000000000001
@@ -14,8 +14,14 @@ title Tests HTTP diretti ai microservizi aggiunti
 
 ### ─────────── Patients Details (Doctor) ───────────
 GET http://{{hostname}}:{{prescPort}}/api/v1/doctors/{{doctorId}}/patients/details
-Authorization: Bearer {{doctorToken}}
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjoxLCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI3Njg2NDIsImV4cCI6MTc1Mjc3MjI0MiwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.4vzDZFouUdhw0U9lePxnKvwxLIJtHRpEtsStc0DQBo4
 Accept: application/json
+
+### ─────────── Me ───────────
+GET http://localhost:8080/api/v1/auth/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjoxLCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI3Njg2NDIsImV4cCI6MTc1Mjc3MjI0MiwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.4vzDZFouUdhw0U9lePxnKvwxLIJtHRpEtsStc0DQBo4Accept: application/json
+Accept: application/json
+
 
 > {%
     client.test("200 OK e lista di CitizenDTO", response.status === 200);

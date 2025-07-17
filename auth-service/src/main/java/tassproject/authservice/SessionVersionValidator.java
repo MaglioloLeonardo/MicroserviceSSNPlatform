@@ -4,7 +4,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
-import tassproject.authservice.repository.UserRepository;
+import tassproject.authservice.UserRepository;
 
 /**
  * Rifiuta i JWT la cui 'ver' non coincide con la sessionVersion salvata a DB.

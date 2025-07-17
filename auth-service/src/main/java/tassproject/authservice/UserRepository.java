@@ -1,4 +1,4 @@
-package tassproject.authservice.repository;
+package tassproject.authservice;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import tassproject.authservice.User;
