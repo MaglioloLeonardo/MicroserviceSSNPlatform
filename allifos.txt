@@ -3712,16 +3712,18 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "drugs", schema = "pharma_service")
-@Data
+@Data                       // genera getter/setter per tutti i campi
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class Drug {
 
+    /* ---------- PK ---------- */
     @Id
     @Column(columnDefinition = "uuid")
     private UUID id;
 
+    /* ---------- Colonne semplici ---------- */
     @Column(name = "nome_commerciale")
     private String nomeCommerciale;
 
@@ -3732,25 +3734,43 @@ public class Drug {
 
     private BigDecimal prezzo;
 
+    /* ---------- Relazione con ActiveIngredient ---------- */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "principio_attivo_id")
     private ActiveIngredient principioAttivo;
+
+    /* ------------------------------------------------------------------
+       ALIAS per compatibilità: getActiveIngredient / setActiveIngredient
+       ------------------------------------------------------------------ */
+
+    /**
+     * Alias di comodo per evitare LazyInitializationException
+     * quando il codice legacy chiama getActiveIngredient().
+     */
+    public ActiveIngredient getActiveIngredient() {
+        return this.principioAttivo;
+    }
+
+    /**
+     * Alias corrispondente al setter.
+     */
+    public void setActiveIngredient(ActiveIngredient activeIngredient) {
+        this.principioAttivo = activeIngredient;
+    }
 }
+
 
 ### File: pharma-service/src/main/java/tassproject/pharmaservice/DrugController.java
 ----------------------------------------
 package tassproject.pharmaservice;
 
-import tassproject.pharmaservice.ActiveIngredientResponse;
-import tassproject.pharmaservice.DrugResponse;
-import tassproject.pharmaservice.DrugService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -3760,30 +3780,51 @@ public class DrugController {
 
     private final DrugService service;
 
+    /**
+     * Ritorna tutti i farmaci in modo reattivo.
+     * Assicurati che DrugService abbia:
+     *   public Flux<DrugResponse> list() { … }
+     */
     @GetMapping
-    public List<DrugResponse> listDrugs() {
+    public Flux<DrugResponse> listDrugs() {
         return service.list();
     }
 
+    /**
+     * Ritorna gli ActiveIngredientResponse di un farmaco.
+     * Assicurati che DrugService abbia:
+     *   public Flux<ActiveIngredientResponse> activeIngredients(UUID id) { … }
+     */
     @GetMapping("/{id}/active-ingredients")
-    public List<ActiveIngredientResponse> activeIngredients(@PathVariable UUID id) {
+    public Flux<ActiveIngredientResponse> activeIngredients(@PathVariable UUID id) {
         return service.activeIngredients(id);
     }
 }
-
 
 
 ### File: pharma-service/src/main/java/tassproject/pharmaservice/DrugRepository.java
 ----------------------------------------
 package tassproject.pharmaservice;
 
-import tassproject.pharmaservice.Drug;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
+@Repository
 public interface DrugRepository extends JpaRepository<Drug, UUID> {
+
+    /**
+     * Carica il farmaco insieme al relativo principio attivo.
+     * NOTA: il nome nell’EntityGraph deve corrispondere al
+     * campo presente in `Drug` (principioAttivo).
+     */
+    @EntityGraph(attributePaths = "principioAttivo")
+    Optional<Drug> findWithActiveIngredientById(UUID id);
 }
+
 
 ### File: pharma-service/src/main/java/tassproject/pharmaservice/DrugResponse.java
 ----------------------------------------
@@ -3807,35 +3848,45 @@ public record DrugResponse(UUID id, String nomeCommerciale, String produttore,
 ----------------------------------------
 package tassproject.pharmaservice;
 
-import  tassproject.pharmaservice.ActiveIngredientResponse;
-import  tassproject.pharmaservice.DrugResponse;
-import  tassproject.pharmaservice.Drug;
-import  tassproject.pharmaservice.DrugRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class DrugService {
 
-    private final DrugRepository repo;
+    private final DrugRepository drugRepository;
 
-    public Drug get(UUID id) {
-        return repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Drug not found: " + id));
+    /*------------------------------------------------------------------
+     * LISTA COMPLETA DEI FARMACI (metodo mancante)
+     *----------------------------------------------------------------*/
+    public Flux<DrugResponse> list() {
+        return Mono.fromCallable(drugRepository::findAll)   // blocco su thread worker
+                .flatMapMany(Flux::fromIterable)         // → Flux<Drug>
+                .map(DrugResponse::from);                // → Flux<DrugResponse>
     }
 
-    public List<ActiveIngredientResponse> activeIngredients(UUID drugId) {
-        Drug drug = get(drugId);
-        return List.of(ActiveIngredientResponse.from(drug.getPrincipioAttivo()));
-    }
-
-    public List<DrugResponse> list() {
-        return repo.findAll().stream().map(DrugResponse::from).toList();
+    /*------------------------------------------------------------------
+     * PRINCIPIO ATTIVO DI UN SINGOLO FARMACO
+     *----------------------------------------------------------------*/
+    public Flux<ActiveIngredientResponse> activeIngredients(UUID drugId) {
+        return Mono.fromCallable(() ->
+                        drugRepository
+                                .findWithActiveIngredientById(drugId)
+                                .orElseThrow(() ->
+                                        new ResourceNotFoundException("Drug", drugId)))
+                .flatMapMany(drug ->
+                        Flux.just(
+                                ActiveIngredientResponse.from(
+                                        drug.getPrincipioAttivo()   // <‑‑ nome corretto
+                                )));
     }
 }
+
 
 ### File: pharma-service/src/main/java/tassproject/pharmaservice/PharmaFamily.java
 ----------------------------------------
@@ -3931,10 +3982,27 @@ public class PharmaServiceApplication {
     }
 }
 
+### File: pharma-service/src/main/java/tassproject/pharmaservice/ResourceNotFoundException.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+/**
+ * Eccezione lanciata quando non si trova una risorsa.
+ */
+public class ResourceNotFoundException extends RuntimeException {
+
+    public ResourceNotFoundException(String resourceName, Object id) {
+        super(String.format("%s non trovato con id %s", resourceName, id));
+    }
+
+}
+
+
 ### File: pharma-service/src/main/java/tassproject/pharmaservice/SecurityConfig.java
 ----------------------------------------
 package tassproject.pharmaservice;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
@@ -3942,34 +4010,42 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
-import org.springframework.beans.factory.annotation.Value;
-
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-
     @Bean
-    public ReactiveJwtDecoder reactiveJwtDecoder(@Value("${jwt.secret}") String secret) {
-        // Use NimbusReactiveJwtDecoder with symmetric key
-        SecretKey key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HMACSHA256");
+    public ReactiveJwtDecoder reactiveJwtDecoder(
+            @Value("${jwt.secret}") String secretValue
+    ) {
+        byte[] keyBytes;
+        try {
+            keyBytes = Base64.getDecoder().decode(secretValue);
+        } catch (IllegalArgumentException ex) {
+            keyBytes = secretValue.getBytes(StandardCharsets.UTF_8);
+        }
+        SecretKey key = new SecretKeySpec(keyBytes, "HmacSHA256");
         return NimbusReactiveJwtDecoder.withSecretKey(key).build();
     }
 
     @Bean
-    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+    public SecurityWebFilterChain springSecurityFilterChain(
+            ServerHttpSecurity http,
+            ReactiveJwtDecoder jwtDecoder
+    ) {
         http
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers("/actuator/health").permitAll()
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwtSpec -> jwtSpec.jwtDecoder(reactiveJwtDecoder(null)))
+                        .jwt(jwt -> jwt.jwtDecoder(jwtDecoder))
                 );
         return http.build();
     }
@@ -3979,12 +4055,32 @@ public class SecurityConfig {
 ### File: pharma-service/src/main/resources/application.properties
 ----------------------------------------
 spring.application.name=pharma-service
+server.port=${SERVER_PORT:8080}
 
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.default_schema=notification_service
+
+management.endpoints.web.exposure.include=health,info
+
+# HikariCP (opzionale)
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=600000
+
+jwt.secret=${JWT_SECRET:my_jwt_secret}
+jwt.expiration=${JWT_EXPIRATION_MS:3600000}
 
 ### File: pharma-service/src/main/resources/application.yml
 ----------------------------------------
 server:
-  port: 8084
+  port: 8080
 spring:
   application:
     name: pharma-service

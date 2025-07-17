@@ -19,7 +19,7 @@ Accept: application/json
 
 ### ─────────── Me ───────────
 GET http://localhost:8080/api/v1/auth/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjoxLCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI3Njg2NDIsImV4cCI6MTc1Mjc3MjI0MiwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.4vzDZFouUdhw0U9lePxnKvwxLIJtHRpEtsStc0DQBo4Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjoxLCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI3Njg2NDIsImV4cCI6MTc1Mjc3MjI0MiwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.4vzDZFouUdhw0U9lePxnKvwxLIJtHRpEtsStc0DQBo4Accept
 Accept: application/json
 
 
@@ -30,7 +30,8 @@ Accept: application/json
 %}
 
 ### ──── Active Ingredients by Drug ────
-GET http://{{hostname}}:{{pharmaPort}}/api/v1/drugs/{{drugId}}/active-ingredients
+GET http://{{hostname}}:8086/api/v1/drugs/52000000-0000-0000-0000-000000000001
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjozLCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI3OTA5NTEsImV4cCI6MTc1Mjc5NDU1MSwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.TYJ3pLL4Q_gFrJNHo9gPR72lQys2yIqpSWrzsjUbMJU
 Accept: application/json
 
 > {%
