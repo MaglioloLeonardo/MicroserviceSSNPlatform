@@ -1,0 +1,57 @@
+@hostname = localhost
+@prescPort = 8081
+@dispPort = 8082
+@invPort = 8083
+@pharmaPort = 8086
+
+@doctorId       = 10000000-0000-0000-0000-000000000001
+@patientId      = 20000000-0000-0000-0000-000000000001
+@pharmacistId   = 30000000-0000-0000-0000-000000000001
+@pharmacyId     = 40000000-0000-0000-0000-000000000001
+@drugId         = 52000000-0000-0000-0000-000000000005
+
+title Tests HTTP diretti ai microservizi aggiunti
+
+### ─────────── Patients Details (Doctor) ───────────
+GET http://{{hostname}}:{{prescPort}}/api/v1/doctors/{{doctorId}}/patients/details
+Authorization: Bearer {{doctorToken}}
+Accept: application/json
+
+> {%
+    client.test("200 OK e lista di CitizenDTO", response.status === 200);
+    const list = response.body;
+    client.test("Ogni elemento ha id, cf, nome, cognome", list.every(p => p.id && p.cf && p.nome && p.cognome));
+%}
+
+### ──── Active Ingredients by Drug ────
+GET http://{{hostname}}:{{pharmaPort}}/api/v1/drugs/{{drugId}}/active-ingredients
+Accept: application/json
+
+> {%
+    client.test("200 OK e array non vuoto", response.status === 200 && Array.isArray(response.body));
+    client.test("Ogni ingrediente ha id e nome", response.body.every(i => i.id && i.nome));
+%}
+
+### ─────── Create Dispensation (Pharmacist) ───────
+POST http://{{hostname}}:{{dispPort}}/api/v1/dispensations
+Authorization: Bearer {{pharmacistToken}}
+Content-Type: application/json
+
+{
+  "prescriptionId": "{{prescId}}",
+  "dispensedBy":    "{{pharmacistId}}"
+}
+> {%
+    client.test("201 Created", response.status === 201);
+    client.global.set("dispId", response.body.id);
+%}
+
+### ──── Inspect Inventory (Pharmacist) ────
+GET http://{{hostname}}:{{invPort}}/api/v1/pharmacies/{{pharmacyId}}/inventory
+Authorization: Bearer {{pharmacistToken}}
+Accept: application/json
+
+> {%
+    client.test("200 OK e lista inventario", response.status === 200);
+    client.test("Ogni item ha drugId e availableQuantity", response.body.every(item => item.drugId && typeof item.availableQuantity === 'number'));
+%}

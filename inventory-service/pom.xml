@@ -38,7 +38,7 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Flyway (🆕 per gestire la rimozione del vecchio FK) -->
+
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>

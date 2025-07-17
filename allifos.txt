@@ -1,3 +1,104 @@
+### File: anagrafica-service/pom.xml
+----------------------------------------
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.3</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>tassproject</groupId>
+    <artifactId>anagrafica-service</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>anagrafica-service</name>
+    <description>anagrafica-service</description>
+    <url/>
+    <licenses>
+        <license/>
+    </licenses>
+    <developers>
+        <developer/>
+    </developers>
+    <scm>
+        <connection/>
+        <developerConnection/>
+        <tag/>
+        <url/>
+    </scm>
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/AnagraficaServiceApplication.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class AnagraficaServiceApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AnagraficaServiceApplication.class, args);
+    }
+
+}
+
+
+### File: anagrafica-service/src/main/resources/application.properties
+----------------------------------------
+spring.application.name=anagrafica-service
+
+
+### File: anagrafica-service/src/test/java/tassproject/anagraficaservice/AnagraficaServiceApplicationTests.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class AnagraficaServiceApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}
+
+
 ### File: api-gateway/pom.xml
 ----------------------------------------
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -56,6 +157,15 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
     </dependencies>
 
@@ -495,6 +605,10 @@ class ApiGatewayApplicationTests {
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
     </dependencies>
@@ -1536,103 +1650,6 @@ class AuthServiceApplicationTests {
 }
 
 
-### File: common/pom.xml
-----------------------------------------
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-
-    <parent>
-        <groupId>tassproject.backend</groupId>
-        <artifactId>backend</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
-    </parent>
-
-    <artifactId>common</artifactId>
-    <packaging>jar</packaging>
-    <name>common</name>
-
-    <dependencies>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.persistence</groupId>
-            <artifactId>jakarta.persistence-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-
-    <!-- libreria: niente repackage -->
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration><skip>true</skip></configuration>
-            </plugin>
-        </plugins>
-    </build>
-</project>
-
-
-### File: common/src/main/java/tassproject/common/CommonApplication.java
-----------------------------------------
-package tassproject.backend.common;
-
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
-
-@SpringBootApplication(
-        exclude = {
-                DataSourceAutoConfiguration.class,
-                HibernateJpaAutoConfiguration.class
-        }
-)
-public class CommonApplication {
-    // Questa classe serve solo per il test di context-loading in common
-}
-
-
-### File: common/src/main/resources/application.properties
-----------------------------------------
-# common module (library, no HTTP exposed)
-spring.application.name=common
-
-
-### File: common/src/test/java/tassproject/common/CommonApplicationTests.java
-----------------------------------------
-package tassproject.common;
-
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import tassproject.backend.common.CommonApplication;
-
-@SpringBootTest(classes = CommonApplication.class)
-class CommonApplicationTests {
-    @Test
-    void contextLoads() {
-    }
-}
-
-
 ### File: dispensation-service/pom.xml
 ----------------------------------------
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -1666,17 +1683,21 @@ class CommonApplicationTests {
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>tassproject.backend</groupId>
-            <artifactId>common</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Testing -->
@@ -2469,11 +2490,6 @@ class DispensationServiceApplicationTests {
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <dependency>
-            <groupId>tassproject.backend</groupId>
-            <artifactId>common</artifactId>
-            <version>${project.version}</version>
-        </dependency>
 
         <!-- Flyway (🆕 per gestire la rimozione del vecchio FK) -->
         <dependency>
@@ -2516,6 +2532,15 @@ class DispensationServiceApplicationTests {
             <artifactId>lombok</artifactId>
             <version>1.18.38</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
     </dependencies>
 
@@ -2596,9 +2621,10 @@ package tassproject.inventoryservice;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tassproject.inventoryservice.repository.InventoryItemRepository;
+import tassproject.inventoryservice.InventoryItemRepository;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -2608,8 +2634,7 @@ public class InventoryApplicationService {
 
     private final InventoryItemRepository repo;
 
-    /* ────────────── lettura ────────────── */
-
+    /* ===== lettura ===== */
     @Transactional(readOnly = true)
     public AvailabilityResponse checkAvailability(UUID drugId) {
         int qty = repo.findByDrugId(drugId)
@@ -2618,29 +2643,26 @@ public class InventoryApplicationService {
         return new AvailabilityResponse(drugId, qty);
     }
 
-    /* ───────────── scrittura ───────────── */
+    /** Elenco completo (DTO) degli articoli di una farmacia. */
+    @Transactional(readOnly = true)
+    public List<InventoryItemResponse> listByPharmacy(UUID pharmacyId) {
+        return repo.findByPharmacyId(pharmacyId).stream()
+                .map(InventoryItemResponse::from)
+                .toList();
+    }
 
+    /* ===== scrittura ===== */
     public void reserve(UUID drugId, int quantity, String reason) {
-
-        // 1) La riga di magazzino DEVE esistere: se manca → 400
         var row = repo.findByDrugId(drugId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Il farmaco %s non è presente a magazzino".formatted(drugId)));
-
-        // 2) Controllo stock sufficiente
-        if (row.getAvailableQuantity() < quantity) {
+        if (row.getAvailableQuantity() < quantity)
             throw new IllegalArgumentException("Scorte insufficienti per la prenotazione");
-        }
-
-        // 3) Aggiornamento quantità
         row.setAvailableQuantity(row.getAvailableQuantity() - quantity);
         row.setLastUpdated(OffsetDateTime.now());
         repo.save(row);
-
-        // (eventuale publish Rabbit / log, se serve)
     }
 }
-
 
 ### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryController.java
 ----------------------------------------
@@ -2650,6 +2672,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -2664,13 +2687,19 @@ public class InventoryController {
         return service.checkAvailability(drugId);
     }
 
-    /* ─────────────── nuovo endpoint “reserve” ─────────────── */
-
     @PostMapping("/inventory/items/{drugId}/reserve")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void reserve(@PathVariable UUID drugId,
-                        @RequestBody ReserveInventoryRequest body) {
+    public void reserve(@PathVariable UUID drugId, @RequestBody ReserveInventoryRequest body) {
         service.reserve(drugId, body.quantity(), body.reason());
+    }
+
+    /* ===== NUOVO: inventario di una farmacia dato il farmacista (frontend passa l’ID farmacia) */
+    @GetMapping("/pharmacists/{pharmacistId}/pharmacies/{pharmacyId}/inventory")
+    public List<InventoryItemResponse> inventoryByPharmacy(
+            @PathVariable UUID pharmacistId,
+            @PathVariable UUID pharmacyId) {
+        // Eventuale authorization layer qui …
+        return service.listByPharmacy(pharmacyId);
     }
 }
 
@@ -2694,70 +2723,70 @@ public class InventoryItem {
     @Column(name = "drug_id", nullable = false, columnDefinition = "uuid")
     private UUID drugId;
 
+    @Column(name = "pharmacy_id", nullable = false, columnDefinition = "uuid")   // 🆕
+    private UUID pharmacyId;
+
     @Column(name = "available_quantity", nullable = false)
     private int availableQuantity;
 
     @Column(name = "last_updated", nullable = false)
     private OffsetDateTime lastUpdated;
 
-    // **Costruttore vuoto richiesto da JPA**
-    public InventoryItem() {}
+    protected InventoryItem() {}
 
-    // (Opzionale) costruttore full-args
-    public InventoryItem(UUID id, UUID drugId, int availableQuantity, OffsetDateTime lastUpdated) {
+    public InventoryItem(UUID id, UUID drugId, UUID pharmacyId, int availableQuantity, OffsetDateTime lastUpdated) {
         this.id = id;
         this.drugId = drugId;
+        this.pharmacyId = pharmacyId;
         this.availableQuantity = availableQuantity;
         this.lastUpdated = lastUpdated;
     }
 
-    // --- Getter e Setter ---
-    public UUID getId() {
-        return id;
-    }
-    public void setId(UUID id) {
-        this.id = id;
-    }
+    // -------- getters/setters --------
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
 
-    public UUID getDrugId() {
-        return drugId;
-    }
-    public void setDrugId(UUID drugId) {
-        this.drugId = drugId;
-    }
+    public UUID getDrugId() { return drugId; }
+    public void setDrugId(UUID drugId) { this.drugId = drugId; }
 
-    public int getAvailableQuantity() {
-        return availableQuantity;
-    }
-    public void setAvailableQuantity(int availableQuantity) {
-        this.availableQuantity = availableQuantity;
-    }
+    public UUID getPharmacyId() { return pharmacyId; }
+    public void setPharmacyId(UUID pharmacyId) { this.pharmacyId = pharmacyId; }
 
-    public OffsetDateTime getLastUpdated() {
-        return lastUpdated;
-    }
-    public void setLastUpdated(OffsetDateTime lastUpdated) {
-        this.lastUpdated = lastUpdated;
-    }
+    public int getAvailableQuantity() { return availableQuantity; }
+    public void setAvailableQuantity(int availableQuantity) { this.availableQuantity = availableQuantity; }
+
+    public OffsetDateTime getLastUpdated() { return lastUpdated; }
+    public void setLastUpdated(OffsetDateTime lastUpdated) { this.lastUpdated = lastUpdated; }
 }
 
 
 ### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryItemRepository.java
 ----------------------------------------
-package tassproject.inventoryservice.repository;
+package tassproject.inventoryservice;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import tassproject.inventoryservice.InventoryItem;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface InventoryItemRepository extends JpaRepository<InventoryItem, UUID> {
-
-    /* Cerca la riga di magazzino per drugId */
     Optional<InventoryItem> findByDrugId(UUID drugId);
-}
+    List<InventoryItem>     findByPharmacyId(UUID pharmacyId); }
 
+### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryItemResponse.java
+----------------------------------------
+package tassproject.inventoryservice;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+public record InventoryItemResponse(UUID id, UUID drugId, int availableQuantity, OffsetDateTime lastUpdated) {
+    public static InventoryItemResponse from(InventoryItem i) {
+        return new InventoryItemResponse(i.getId(), i.getDrugId(), i.getAvailableQuantity(), i.getLastUpdated());
+    }
+}
 
 ### File: inventory-service/src/main/java/tassproject/inventoryservice/InventoryServiceApplication.java
 ----------------------------------------
@@ -2776,6 +2805,35 @@ public class InventoryServiceApplication {
 }
 
 
+### File: inventory-service/src/main/java/tassproject/inventoryservice/Pharmacy.java
+----------------------------------------
+package tassproject.inventoryservice;
+
+import jakarta.persistence.*;
+import java.util.UUID;
+
+@Entity
+@Table(name = "pharmacies")
+public class Pharmacy {
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    private String nome;
+    private String indirizzo;
+
+    protected Pharmacy() {}
+    public Pharmacy(UUID id, String nome, String indirizzo) {
+        this.id = id;
+        this.nome = nome;
+        this.indirizzo = indirizzo;
+    }
+
+    public UUID getId() { return id; }
+    public String getNome() { return nome; }
+    public String getIndirizzo() { return indirizzo; }
+}
+
 ### File: inventory-service/src/main/java/tassproject/inventoryservice/ReserveInventoryRequest.java
 ----------------------------------------
 package tassproject.inventoryservice;
@@ -2790,42 +2848,34 @@ public record ReserveInventoryRequest(
 
 ### File: inventory-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=inventory-service
-server.port=${SERVER_PORT:8080}
+<<ERROR reading file: 'utf-8' codec can't decode byte 0xec in position 662: invalid continuation byte>>
 
-# ???????????????? DATASOURCE ????????????????
-spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
-spring.datasource.username=${SPRING_DATASOURCE_USERNAME:myuser}
-spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secret}
-spring.datasource.driver-class-name=org.postgresql.Driver
-
-# ???????????????? JPA / HIBERNATE ????????????????
-spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
-spring.jpa.properties.hibernate.default_schema=inventory_service
-
-# ???????????????? FLYWAY ????????????????
-spring.flyway.schemas=inventory_service
-spring.flyway.baseline-on-migrate=true
-spring.flyway.baseline-version=0
-
-# ???????????????? ACTUATOR ????????????????
-management.endpoints.web.exposure.include=health,info
-
-# ???????????????? HIKARICP ????????????????
-spring.datasource.hikari.maximum-pool-size=10
-spring.datasource.hikari.minimum-idle=2
-spring.datasource.hikari.idle-timeout=300000
-spring.datasource.hikari.max-lifetime=600000
-
-jwt.secret=${JWT_SECRET:my_jwt_secret}
-jwt.expiration=${JWT_EXPIRATION_MS:3600000}
 
 ### File: inventory-service/src/main/resources/db/migration/V1__drop_inventory_items_drug_fk.sql
 ----------------------------------------
 -- Rimuove il vecchio vincolo che puntava alla tabella inesistente "drugs"
 ALTER TABLE IF EXISTS inventory_service.inventory_items
     DROP CONSTRAINT IF EXISTS inventory_items_drug_id_fkey;
+
+
+### File: inventory-service/src/main/resources/db/migration/V2__add_pharmacy_id_to_inventory.sql
+----------------------------------------
+BEGIN;
+
+-- 1) Aggiungi prima la colonna nullable
+ALTER TABLE inventory_service.inventory_items
+    ADD COLUMN pharmacy_id UUID;
+
+-- 2) Popola il campo per le righe esistenti
+UPDATE inventory_service.inventory_items
+SET pharmacy_id = '00000000-0000-0000-0000-000000000000'
+WHERE pharmacy_id IS NULL;
+
+-- 3) Imposta la colonna NOT NULL
+ALTER TABLE inventory_service.inventory_items
+    ALTER COLUMN pharmacy_id SET NOT NULL;
+
+COMMIT;
 
 
 ### File: inventory-service/src/test/java/tassproject/inventoryservice/InventoryItemRepositoryIT.java
@@ -2840,7 +2890,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import tassproject.inventoryservice.repository.InventoryItemRepository;
+import tassproject.inventoryservice.InventoryItemRepository;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -2952,13 +3002,6 @@ class InventoryServiceApplicationTests {
             <scope>provided</scope>
         </dependency>
 
-        <!-- Common condiviso → usa lo stesso groupId del parent -->
-        <dependency>
-            <groupId>tassproject.backend</groupId>
-            <artifactId>common</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -2969,6 +3012,15 @@ class InventoryServiceApplicationTests {
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
     </dependencies>
@@ -3146,6 +3198,579 @@ class NotificationServiceApplicationTests {
 }
 
 
+### File: pharma-service/pom.xml
+----------------------------------------
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 1) Parent: aggregatore backend che include Spring Boot parent e BOM -->
+    <parent>
+        <groupId>tassproject.backend</groupId>
+        <artifactId>backend</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <!-- 2) Coordinate del modulo -->
+    <groupId>it.mycompany</groupId>
+    <artifactId>pharma-service</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>Pharma Service</name>
+    <description>Microservizio per gestione farmaci, principi attivi e famiglie farmaceutiche.</description>
+    <packaging>jar</packaging>
+
+    <!-- 3) Imposta Java 17 per compile & test -->
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <spring-boot.version>3.1.1</spring-boot.version>
+    </properties>
+
+    <!-- 4) Dipendenze principali -->
+    <dependencies>
+        <!-- Web MVC e Reactor (WebFlux) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <!-- JPA / Hibernate -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!-- Validazione Bean -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <!-- Security (JWT + roles) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <!-- PostgreSQL Driver -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- Lombok per ridurre boilerplate -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- CLIENT per chiamate ad altri microservizi (su WebClient) -->
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty-http</artifactId>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.junit.vintage</groupId>
+                    <artifactId>junit-vintage-engine</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <!-- Starter per WebFlux + Security JWT -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <!-- Supporto JOSE / JWT -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
+    </dependencies>
+
+    <!-- 5) Plugin di build -->
+    <build>
+        <plugins>
+            <!-- Spring Boot: packaging eseguibile -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Compiler: assicura Java 17 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.10.1</version>
+                <configuration>
+                    <release>${java.version}</release>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- 6) Gestione dei repository (se hai repository interni) -->
+    <!--
+    <repositories>
+      <repository>
+        <id>company-repo</id>
+        <url>https://repo.mycompany.it/maven2</url>
+      </repository>
+    </repositories>
+    -->
+</project>
+
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/ActiveIngredient.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.util.UUID;
+
+@Entity
+@Table(name = "active_ingredients", schema = "pharma_service")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ActiveIngredient {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    private String nome;
+
+    private String descrizione;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "famiglia_id")
+    private PharmaFamily famiglia;
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/ActiveIngredientController.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import tassproject.pharmaservice.ActiveIngredientResponse;
+import tassproject.pharmaservice.ActiveIngredientService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/active-ingredients")
+@RequiredArgsConstructor
+public class ActiveIngredientController {
+
+    private final ActiveIngredientService service;
+
+    @GetMapping
+    public List<ActiveIngredientResponse> list() {
+        return service.listAll();
+    }
+}
+
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/ActiveIngredientRepository.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import tassproject.pharmaservice.ActiveIngredient;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.UUID;
+
+public interface ActiveIngredientRepository extends JpaRepository<ActiveIngredient, UUID> {
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/ActiveIngredientResponse.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import tassproject.pharmaservice.ActiveIngredient;
+
+import java.util.UUID;
+
+public record ActiveIngredientResponse(UUID id, String nome, String descrizione, UUID famigliaId) {
+    public static ActiveIngredientResponse from(ActiveIngredient a) {
+        return new ActiveIngredientResponse(a.getId(), a.getNome(), a.getDescrizione(),
+                a.getFamiglia() != null ? a.getFamiglia().getId() : null);
+    }
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/ActiveIngredientService.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import tassproject.pharmaservice.ActiveIngredientResponse;
+import tassproject.pharmaservice.ActiveIngredient;
+import tassproject.pharmaservice.ActiveIngredientRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class ActiveIngredientService {
+
+    private final ActiveIngredientRepository repo;
+
+    public ActiveIngredient get(UUID id) {
+        return repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Active ingredient not found: " + id));
+    }
+
+    public List<ActiveIngredientResponse> listAll() {
+        return repo.findAll().stream().map(ActiveIngredientResponse::from).toList();
+    }
+}
+
+
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/Drug.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Entity
+@Table(name = "drugs", schema = "pharma_service")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Drug {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    @Column(name = "nome_commerciale")
+    private String nomeCommerciale;
+
+    private String produttore;
+
+    @Column(name = "modo_somministrazione")
+    private String modoSomministrazione;
+
+    private BigDecimal prezzo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "principio_attivo_id")
+    private ActiveIngredient principioAttivo;
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/DrugController.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import tassproject.pharmaservice.ActiveIngredientResponse;
+import tassproject.pharmaservice.DrugResponse;
+import tassproject.pharmaservice.DrugService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/drugs")
+@RequiredArgsConstructor
+public class DrugController {
+
+    private final DrugService service;
+
+    @GetMapping
+    public List<DrugResponse> listDrugs() {
+        return service.list();
+    }
+
+    @GetMapping("/{id}/active-ingredients")
+    public List<ActiveIngredientResponse> activeIngredients(@PathVariable UUID id) {
+        return service.activeIngredients(id);
+    }
+}
+
+
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/DrugRepository.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import tassproject.pharmaservice.Drug;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.UUID;
+
+public interface DrugRepository extends JpaRepository<Drug, UUID> {
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/DrugResponse.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import tassproject.pharmaservice.Drug;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+public record DrugResponse(UUID id, String nomeCommerciale, String produttore,
+                           String modoSomministrazione, BigDecimal prezzo, UUID principioAttivoId) {
+    public static DrugResponse from(Drug d) {
+        return new DrugResponse(d.getId(), d.getNomeCommerciale(), d.getProduttore(),
+                d.getModoSomministrazione(), d.getPrezzo(),
+                d.getPrincipioAttivo() != null ? d.getPrincipioAttivo().getId() : null);
+    }
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/DrugService.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import  tassproject.pharmaservice.ActiveIngredientResponse;
+import  tassproject.pharmaservice.DrugResponse;
+import  tassproject.pharmaservice.Drug;
+import  tassproject.pharmaservice.DrugRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class DrugService {
+
+    private final DrugRepository repo;
+
+    public Drug get(UUID id) {
+        return repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Drug not found: " + id));
+    }
+
+    public List<ActiveIngredientResponse> activeIngredients(UUID drugId) {
+        Drug drug = get(drugId);
+        return List.of(ActiveIngredientResponse.from(drug.getPrincipioAttivo()));
+    }
+
+    public List<DrugResponse> list() {
+        return repo.findAll().stream().map(DrugResponse::from).toList();
+    }
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/PharmaFamily.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.util.UUID;
+
+@Entity
+@Table(name = "pharma_families", schema = "pharma_service")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class PharmaFamily {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    private String nome;
+
+    private String descrizione;
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/PharmaFamilyController.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import tassproject.pharmaservice.PharmaFamilyResponse;
+import tassproject.pharmaservice.PharmaFamily;
+import tassproject.pharmaservice.PharmaFamilyRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/pharma-families")
+@RequiredArgsConstructor
+public class PharmaFamilyController {
+
+    private final PharmaFamilyRepository repo;
+
+    @GetMapping
+    public List<PharmaFamilyResponse> list() {
+        return repo.findAll().stream().map(PharmaFamilyResponse::from).toList();
+    }
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/PharmaFamilyRepository.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import tassproject.pharmaservice.PharmaFamily;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.UUID;
+
+public interface PharmaFamilyRepository extends JpaRepository<PharmaFamily, UUID> {
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/PharmaFamilyResponse.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import tassproject.pharmaservice.PharmaFamily;
+
+import java.util.UUID;
+
+public record PharmaFamilyResponse(UUID id, String nome, String descrizione) {
+    public static PharmaFamilyResponse from(PharmaFamily f) {
+        return new PharmaFamilyResponse(f.getId(), f.getNome(), f.getDescrizione());
+    }
+}
+
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/PharmaServiceApplication.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class PharmaServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(PharmaServiceApplication.class, args);
+    }
+}
+
+### File: pharma-service/src/main/java/tassproject/pharmaservice/SecurityConfig.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+
+@Configuration
+@EnableWebFluxSecurity
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        return http
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .authorizeExchange(ex -> ex
+                        .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
+                        .anyExchange().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
+                .build();
+    }
+}
+
+### File: pharma-service/src/main/resources/application.properties
+----------------------------------------
+spring.application.name=pharma-service
+
+
+### File: pharma-service/src/main/resources/application.yml
+----------------------------------------
+server:
+  port: 8084
+spring:
+  application:
+    name: pharma-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/health
+    username: ${DB_USER:myuser}
+    password: ${DB_PASS:mypass}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+logging:
+  level:
+    sql: debug
+
+# Security (JWT)
+jwt:
+  issuer: health‑stack
+
+### File: pharma-service/src/test/java/tassproject/pharmaservice/PharmaServiceApplicationTests.java
+----------------------------------------
+package tassproject.pharmaservice;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class PharmaServiceApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}
+
+
 ### File: pom.xml
 ----------------------------------------
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -3275,9 +3900,9 @@ class NotificationServiceApplicationTests {
 
     <!-- 6) Moduli figli -->
     <modules>
-        <module>common</module>
         <module>api-gateway</module>
         <module>prescription-service</module>
+        <module>pharma-service</module>
         <module>dispensation-service</module>
         <module>inventory-service</module>
         <module>notification-service</module>
@@ -3350,11 +3975,6 @@ class NotificationServiceApplicationTests {
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         <dependency>
-            <groupId>tassproject.backend</groupId>
-            <artifactId>common</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
         </dependency>
@@ -3390,6 +4010,10 @@ class NotificationServiceApplicationTests {
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webflux</artifactId>
         </dependency>
     </dependencies>
 
@@ -3522,6 +4146,56 @@ public class AuthorizationService {
     }
 }
 
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/CitizenClient.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import tassproject.prescriptionservice.CitizenDTO;
+
+import java.util.UUID;
+
+/** REST‑client minimale verso anagrafica‑service. */
+@Component
+public class CitizenClient {
+
+    private final WebClient web;
+
+    public CitizenClient(
+            @Value("${anagrafica-service.base-url:http://anagrafica-service:8080}")
+            String baseUrl) {
+        this.web = WebClient.builder().baseUrl(baseUrl).build();
+    }
+
+    public CitizenDTO findById(UUID id) {
+        return web.get()
+                .uri("/api/v1/citizens/{id}", id)
+                .retrieve()
+                .bodyToMono(CitizenDTO.class)
+                .block();
+    }
+}
+
+### File: prescription-service/src/main/java/tassproject/prescriptionservice/CitizenDTO.java
+----------------------------------------
+package tassproject.prescriptionservice;
+
+import java.time.LocalDate;
+import java.util.UUID;
+
+/** DTO ri‑usabile inter‑service con i campi anagrafici essenziali. */
+public record CitizenDTO(
+        UUID id,
+        String cf,
+        String nome,
+        String cognome,
+        LocalDate dataNascita,
+        String luogoNascita,
+        String cittaResidenza) {
+}
 
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/CreatePrescriptionRequest.java
 ----------------------------------------
@@ -3810,26 +4484,29 @@ package tassproject.prescriptionservice;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import tassproject.prescriptionservice.AuthorizationService;
+import tassproject.prescriptionservice.CitizenDTO;
+import tassproject.prescriptionservice.CitizenClient;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1")
 public class PrescriptionController {
 
     private final PrescriptionApplicationService service;
-    private final AuthorizationService authz;
+    private final AuthorizationService            authz;
+    private final CitizenClient                   citizens;   // 🆕
 
     public PrescriptionController(PrescriptionApplicationService service,
-                                  AuthorizationService authz) {
-        this.service = service;
-        this.authz   = authz;
+                                  AuthorizationService authz,
+                                  CitizenClient citizens) {   // 🆕
+        this.service  = service;
+        this.authz    = authz;
+        this.citizens = citizens;
     }
 
     /* ------------------------------ CRUD ESISTENTI -------------------- */
-
     @PostMapping("/prescriptions")
     @ResponseStatus(HttpStatus.CREATED)
     public PrescriptionResponse create(@Valid @RequestBody CreatePrescriptionRequest request) {
@@ -3860,8 +4537,7 @@ public class PrescriptionController {
         return service.updateStatus(id, body.newStatus());
     }
 
-    /* ------------------------------ NUOVI ENDPOINT -------------------- */
-
+    /* ------------------------------ QUERY UUID ----------------------- */
     @GetMapping("/doctors/{doctorId}/patients")
     public List<UUID> patientsOfDoctor(@PathVariable UUID doctorId) {
         authz.assertCanAccessDoctor(doctorId);
@@ -3885,8 +4561,17 @@ public class PrescriptionController {
         authz.assertCanAccessPatient(patientId);
         return service.getDrugIdsByPatient(patientId);
     }
-}
 
+    /* ----------------------- NUOVO: DETTAGLI PAZIENTI ---------------- */
+    @GetMapping("/doctors/{doctorId}/patients/details")
+    public List<CitizenDTO> patientDetails(@PathVariable UUID doctorId) {
+        authz.assertCanAccessDoctor(doctorId);
+        return service.getPatientsByDoctor(doctorId).stream()
+                .map(citizens::findById)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+}
 
 ### File: prescription-service/src/main/java/tassproject/prescriptionservice/PrescriptionItem.java
 ----------------------------------------
