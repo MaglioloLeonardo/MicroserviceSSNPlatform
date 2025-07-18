@@ -18,6 +18,7 @@ COPY notification-service/pom.xml notification-service/pom.xml
 COPY prescription-service/pom.xml prescription-service/pom.xml
 COPY auth-service/pom.xml           auth-service/pom.xml
 COPY pharma-service/pom.xml         pharma-service/pom.xml
+COPY anagrafica-service/pom.xml         anagrafica-service/pom.xml
 
 # Scarico tutte le dipendenze in anticipo
 RUN ./mvnw -B dependency:go-offline
@@ -30,6 +31,7 @@ COPY notification-service   notification-service
 COPY prescription-service   prescription-
 COPY auth-service/           auth-service/
 COPY pharma-service/         pharma-service/
+COPY anagrafica-service/         anagrafica-service/
 
 # 4️⃣ Compilo solo dispensation-service (+ dipendenze interne) e skippo i test
 RUN ./mvnw -B clean package \

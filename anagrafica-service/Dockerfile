@@ -16,8 +16,8 @@ COPY dispensation-service/pom.xml dispensation-service/pom.xml
 COPY inventory-service/pom.xml    inventory-service/pom.xml
 COPY notification-service/pom.xml notification-service/pom.xml
 COPY prescription-service/pom.xml prescription-service/pom.xml
-COPY pharma-service/pom.xml         pharma-service/pom.xml
 COPY auth-service/pom.xml         auth-service/pom.xml
+COPY pharma-service/pom.xml         pharma-service/pom.xml
 COPY anagrafica-service/pom.xml         anagrafica-service/pom.xml
 
 # Scarico tutte le dipendenze in anticipo
@@ -33,9 +33,8 @@ COPY auth-service/          auth-service/
 COPY pharma-service/         pharma-service/
 COPY anagrafica-service/         anagrafica-service/
 
-# 4️⃣ Compilo solo auth-service (+ dipendenze interne) e skippo i test
 RUN ./mvnw -B clean package \
-       -pl pharma-service \
+       -pl anagrafica-service \
        -am \
        -DskipTests
 
@@ -50,7 +49,7 @@ USER root
 RUN apk add --no-cache wget
 
 # Copio il jar
-COPY --from=build /workspace/pharma-service/target/*.jar app.jar
+COPY --from=build /workspace/anagrafica-service/target/*.jar app.jar
 
 # Creo utente non-root
 RUN addgroup --system spring && adduser --system --ingroup spring spring

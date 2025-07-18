@@ -3770,6 +3770,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
@@ -3780,21 +3781,19 @@ public class DrugController {
 
     private final DrugService service;
 
-    /**
-     * Ritorna tutti i farmaci in modo reattivo.
-     * Assicurati che DrugService abbia:
-     *   public Flux<DrugResponse> list() { … }
-     */
+    /*----------- GET /api/v1/drugs -----------*/
     @GetMapping
     public Flux<DrugResponse> listDrugs() {
         return service.list();
     }
 
-    /**
-     * Ritorna gli ActiveIngredientResponse di un farmaco.
-     * Assicurati che DrugService abbia:
-     *   public Flux<ActiveIngredientResponse> activeIngredients(UUID id) { … }
-     */
+    /*------ GET /api/v1/drugs/{id} -----------*/
+    @GetMapping("/{id}")
+    public Mono<DrugResponse> getDrug(@PathVariable UUID id) {
+        return service.get(id);
+    }
+
+    /*-- GET /api/v1/drugs/{id}/active-ingredients --*/
     @GetMapping("/{id}/active-ingredients")
     public Flux<ActiveIngredientResponse> activeIngredients(@PathVariable UUID id) {
         return service.activeIngredients(id);
@@ -3855,6 +3854,13 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+/**
+ * Service‑layer del micro‑servizio “pharma”.
+ * Ora gestisce:
+ *   • lista completa dei farmaci
+ *   • dettaglio di un singolo farmaco
+ *   • principio attivo di un farmaco
+ */
 @Service
 @RequiredArgsConstructor
 public class DrugService {
@@ -3862,27 +3868,40 @@ public class DrugService {
     private final DrugRepository drugRepository;
 
     /*------------------------------------------------------------------
-     * LISTA COMPLETA DEI FARMACI (metodo mancante)
+     * 1) LISTA COMPLETA DEI FARMACI
      *----------------------------------------------------------------*/
     public Flux<DrugResponse> list() {
-        return Mono.fromCallable(drugRepository::findAll)   // blocco su thread worker
+        return Mono.fromCallable(drugRepository::findAll)   // blocca su thread worker
                 .flatMapMany(Flux::fromIterable)         // → Flux<Drug>
                 .map(DrugResponse::from);                // → Flux<DrugResponse>
     }
 
     /*------------------------------------------------------------------
-     * PRINCIPIO ATTIVO DI UN SINGOLO FARMACO
+     * 2) DETTAGLIO DI UN SINGOLO FARMACO
+     *----------------------------------------------------------------*/
+    public Mono<DrugResponse> get(UUID drugId) {
+        return Mono.fromCallable(() ->
+                        drugRepository.findById(drugId)
+                                .orElseThrow(() ->
+                                        new ResourceNotFoundException("Drug", drugId))
+                )
+                .map(DrugResponse::from);                   // → Mono<DrugResponse>
+    }
+
+    /*------------------------------------------------------------------
+     * 3) PRINCIPIOATTIVO DI UN FARMACO
      *----------------------------------------------------------------*/
     public Flux<ActiveIngredientResponse> activeIngredients(UUID drugId) {
         return Mono.fromCallable(() ->
                         drugRepository
                                 .findWithActiveIngredientById(drugId)
                                 .orElseThrow(() ->
-                                        new ResourceNotFoundException("Drug", drugId)))
+                                        new ResourceNotFoundException("Drug", drugId))
+                )
                 .flatMapMany(drug ->
                         Flux.just(
                                 ActiveIngredientResponse.from(
-                                        drug.getPrincipioAttivo()   // <‑‑ nome corretto
+                                        drug.getPrincipioAttivo()   // campo corretto
                                 )));
     }
 }
