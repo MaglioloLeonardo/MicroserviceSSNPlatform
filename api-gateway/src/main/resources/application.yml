@@ -44,6 +44,18 @@ spring:
           predicates:
             - Path=/api/v1/users/**
 
+        # ─────────────  ANAGRAFICA – cittadini  ─────────────
+        - id: anagrafica-citizens
+          uri: ${ANAGRAFICA_SERVICE_URL:http://anagrafica-service:8080}
+          predicates:
+            - Path=/api/v1/citizens/**
+
+        # ─────────────  ANAGRAFICA – pazienti di un medico  ─────────────
+        - id: anagrafica-doctor-patients
+          uri: ${ANAGRAFICA_SERVICE_URL:http://anagrafica-service:8080}
+          predicates:
+            - Path=/api/v1/doctors/*/patients
+
         # ─────────────  PRESCRIPTION  ─────────────
         - id: prescription-service
           uri: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
@@ -53,6 +65,14 @@ spring:
             - Path=/api/v1/doctors/**
             - Path=/api/v1/patients/*/drugs/**
             - Path=/api/v1/patients/*/doctors/**
+
+        # ─────────────  PHARMA  ─────────────
+        - id: pharma-service
+          uri: ${PHARMA_SERVICE_URL:http://pharma-service:8080}
+          predicates:
+            - Path=/api/v1/drugs/**
+            - Path=/api/v1/active-ingredients/**
+            - Path=/api/v1/pharma-families/**
 
         # ─────────────  DISPENSATION  ─────────────
         - id: dispensation-service

@@ -12,6 +12,12 @@
 
 title Tests HTTP diretti ai microservizi aggiunti
 
+
+### 3) Chi sono? → `/api/v1/auth/me`
+GET http://{{hostname}}:8080/api/v1/citizens/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjo1LCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI4NTgwODQsImV4cCI6MTc1Mjg2MTY4NCwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.tpDAp-eCIAdlXMoIjTaGnras3qm_w2OPH-96gLJxcCM
+Accept: application/json
+
 ### ─────────── Patients Details (Doctor) ───────────
 GET http://{{hostname}}:{{prescPort}}/api/v1/doctors/{{doctorId}}/patients/details
 Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjoxLCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI3Njg2NDIsImV4cCI6MTc1Mjc3MjI0MiwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.4vzDZFouUdhw0U9lePxnKvwxLIJtHRpEtsStc0DQBo4

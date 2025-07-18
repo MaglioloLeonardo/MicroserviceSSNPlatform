@@ -1,63 +1,183 @@
 ### File: anagrafica-service/pom.xml
 ----------------------------------------
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!-- 1) Versione del modello POM -->
     <modelVersion>4.0.0</modelVersion>
+
+    <!-- 2) Eredito dal POM aggregatore (backend/pom.xml) -->
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.3</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <groupId>tassproject.backend</groupId>
+        <artifactId>backend</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
-    <groupId>tassproject</groupId>
+
+    <!-- 3) Coordinate del modulo -->
+    <groupId>tassproject.backend</groupId>
     <artifactId>anagrafica-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
     <name>anagrafica-service</name>
     <description>anagrafica-service</description>
-    <url/>
-    <licenses>
-        <license/>
-    </licenses>
-    <developers>
-        <developer/>
-    </developers>
-    <scm>
-        <connection/>
-        <developerConnection/>
-        <tag/>
-        <url/>
-    </scm>
+
+    <!-- 4) Proprietà specifiche del modulo -->
     <properties>
         <java.version>17</java.version>
+        <!-- encoding per risorse -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
+
+    <!-- 5) Dipendenze del servizio -->
     <dependencies>
+        <!-- Core -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
 
+        <!-- Reactive WebClient per chiamate a prescription-service -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- Validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Database -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Lombok (solo in fase di build) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.5</version>
+            <scope>compile</scope>
+        </dependency>
+        <!-- JJWT API (serve per compilare) -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.5</version>
+        </dependency>
+        <!-- JJWT Impl (serve a runtime) -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.5</version>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- JJWT Jackson (serve a runtime per JSON processing) -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.5</version>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 
+    <!-- 6) Configurazione risorse e plugin di build -->
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
         <plugins>
+            <!-- Maven Resources Plugin con encoding UTF-8 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                </configuration>
+            </plugin>
+            <!-- Spring Boot Maven Plugin -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>
-
 </project>
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/AnagraficaApplicationService.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tassproject.anagraficaservice.CitizenResponse;
+import tassproject.anagraficaservice.Citizen;
+import tassproject.anagraficaservice.CitizenRepository;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@Transactional(readOnly = true)
+public class AnagraficaApplicationService {
+
+    private final CitizenRepository citizens;
+
+    public AnagraficaApplicationService(CitizenRepository citizens) {
+        this.citizens = citizens;
+    }
+
+    public CitizenResponse getCitizen(UUID id) {
+        Citizen c = citizens.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Citizen not found"));
+        return CitizenResponse.from(c);
+    }
+
+    public List<CitizenResponse> listCitizens(List<UUID> ids) {
+        return citizens.findAllById(ids).stream()
+                .map(CitizenResponse::from)
+                .toList();
+    }
+}
 
 
 ### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/AnagraficaServiceApplication.java
@@ -77,9 +197,476 @@ public class AnagraficaServiceApplication {
 }
 
 
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/AuthorizationService.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import jakarta.annotation.Nonnull;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import tassproject.anagraficaservice.PrescriptionClient;
+
+import java.util.List;
+import java.util.UUID;
+
+@Component
+@Transactional(readOnly = true)
+public class AuthorizationService {
+
+    private final PrescriptionClient prescriptions;
+
+    public AuthorizationService(PrescriptionClient prescriptions) {
+        this.prescriptions = prescriptions;
+    }
+
+    /* —— Utility JWT —— */
+    private Authentication auth() {
+        return org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+    }
+
+    private String role() {
+        return auth().getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).findFirst().orElse("");
+    }
+
+    public UUID userId() {   // esposto anche al Controller
+        var token = (JwtAuthenticationToken) auth();
+        String id = token.getToken().getClaimAsString("citizen_id");
+        if (id == null) throw new AccessDeniedException("Missing claim citizen_id");
+        return UUID.fromString(id);
+    }
+
+    /* —— Verifica diritti su un cittadino —— */
+    public void assertCanAccessCitizen(@Nonnull UUID citizenId) {
+        switch (role()) {
+            case "ROLE_PATIENT" -> {
+                if (!userId().equals(citizenId))
+                    deny("Puoi accedere solo alla tua anagrafica.");
+            }
+            case "ROLE_DOCTOR" -> {
+                if (userId().equals(citizenId)) return;  // medico che guarda se stesso
+                List<UUID> myPatients = prescriptions.patientsOfDoctor(userId());
+                if (!myPatients.contains(citizenId))
+                    deny("Il paziente non è in carico a questo medico.");
+            }
+            case "ROLE_ADMIN" -> { /* sempre ok */ }
+            default -> deny("Accesso non consentito.");
+        }
+    }
+
+    /* —— Verifica diritti su lista pazienti —— */
+    public void assertCanAccessDoctorPatients(@Nonnull UUID doctorId) {
+        switch (role()) {
+            case "ROLE_DOCTOR" -> {
+                if (!userId().equals(doctorId))
+                    deny("Puoi elencare solo i tuoi pazienti.");
+            }
+            case "ROLE_ADMIN" -> { }
+            default -> deny("Accesso non consentito.");
+        }
+    }
+
+    private void deny(String msg) {
+        throw new AccessDeniedException(msg);
+    }
+}
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/Citizen.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Entity
+@Table(name = "citizens", schema = "anagrafica_service")
+public class Citizen {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    @Column(nullable = false, unique = true, length = 16)
+    private String cf;
+
+    @Column(nullable = false, length = 100)
+    private String nome;
+
+    @Column(nullable = false, length = 100)
+    private String cognome;
+
+    @Column(name = "data_nascita", nullable = false)
+    private LocalDate dataNascita;
+
+    @Column(name = "luogo_nascita", length = 100)
+    private String luogoNascita;
+
+    @Column(name = "citta_residenza", length = 100)
+    private String cittaResidenza;
+
+    @Column(name = "tipo_utente", nullable = false, length = 16)
+    private String tipoUtente;
+
+    protected Citizen() {}
+
+    public Citizen(UUID id,
+                   String cf,
+                   String nome,
+                   String cognome,
+                   LocalDate dataNascita,
+                   String luogoNascita,
+                   String cittaResidenza,
+                   String tipoUtente) {
+        this.id             = id;
+        this.cf             = cf;
+        this.nome           = nome;
+        this.cognome        = cognome;
+        this.dataNascita    = dataNascita;
+        this.luogoNascita   = luogoNascita;
+        this.cittaResidenza = cittaResidenza;
+        this.tipoUtente     = tipoUtente;
+    }
+
+    /* —— Getters & Setters —— */
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public String getCf() { return cf; }
+    public void setCf(String cf) { this.cf = cf; }
+
+    public String getNome() { return nome; }
+    public void setNome(String nome) { this.nome = nome; }
+
+    public String getCognome() { return cognome; }
+    public void setCognome(String cognome) { this.cognome = cognome; }
+
+    public LocalDate getDataNascita() { return dataNascita; }
+    public void setDataNascita(LocalDate dataNascita) { this.dataNascita = dataNascita; }
+
+    public String getLuogoNascita() { return luogoNascita; }
+    public void setLuogoNascita(String luogoNascita) { this.luogoNascita = luogoNascita; }
+
+    public String getCittaResidenza() { return cittaResidenza; }
+    public void setCittaResidenza(String cittaResidenza) { this.cittaResidenza = cittaResidenza; }
+
+    public String getTipoUtente() { return tipoUtente; }
+    public void setTipoUtente(String tipoUtente) { this.tipoUtente = tipoUtente; }
+}
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/CitizenController.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+import tassproject.anagraficaservice.CitizenResponse;
+import tassproject.anagraficaservice.AuthorizationService;
+import tassproject.anagraficaservice.AnagraficaApplicationService;
+import tassproject.anagraficaservice.PrescriptionClient;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1")
+@RequiredArgsConstructor
+public class CitizenController {
+
+    private final AnagraficaApplicationService service;
+    private final AuthorizationService         authz;
+    private final PrescriptionClient           prescriptions;
+
+    /* ——— 1) La mia anagrafica ——— */
+    @GetMapping("/citizens/me")
+    public CitizenResponse me() {
+        UUID me = authz.userId();
+        return service.getCitizen(me);
+    }
+
+    /* ——— 2) Singolo cittadino ——— */
+    @GetMapping("/citizens/{citizenId}")
+    public CitizenResponse citizen(@PathVariable UUID citizenId) {
+        authz.assertCanAccessCitizen(citizenId);
+        return service.getCitizen(citizenId);
+    }
+
+    /* ——— 3) Tutti i pazienti di un medico ——— */
+    @GetMapping("/doctors/{doctorId}/patients")
+    public List<CitizenResponse> patientsOfDoctor(@PathVariable UUID doctorId) {
+        authz.assertCanAccessDoctorPatients(doctorId);
+        List<UUID> ids = prescriptions.patientsOfDoctor(doctorId);
+        return service.listCitizens(ids);
+    }
+}
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/CitizenRepository.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.anagraficaservice.Citizen;
+
+import java.util.UUID;
+
+public interface CitizenRepository extends JpaRepository<Citizen, UUID> {
+}
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/CitizenResponse.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import tassproject.anagraficaservice.Citizen;
+
+import java.time.LocalDate;
+import java.util.UUID;
+
+public record CitizenResponse(
+        UUID id,
+        String cf,
+        String nome,
+        String cognome,
+        LocalDate dataNascita,
+        String luogoNascita,
+        String cittaResidenza,
+        String tipoUtente
+) {
+    public static CitizenResponse from(Citizen c) {
+        return new CitizenResponse(
+                c.getId(),
+                c.getCf(),
+                c.getNome(),
+                c.getCognome(),
+                c.getDataNascita(),
+                c.getLuogoNascita(),
+                c.getCittaResidenza(),
+                c.getTipoUtente()
+        );
+    }
+}
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/Doctor.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import jakarta.persistence.*;
+import java.util.UUID;
+
+@Entity
+@Table(name = "doctors", schema = "anagrafica_service")
+public class Doctor {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id")
+    @MapsId
+    private Citizen citizen;
+
+    private String specializzazione;
+
+    protected Doctor() {}
+
+    public Doctor(Citizen citizen, String specializzazione) {
+        this.citizen          = citizen;
+        this.specializzazione = specializzazione;
+    }
+
+    /* —— Getters —— */
+    public UUID getId()                   { return id; }
+    public Citizen getCitizen()           { return citizen; }
+    public String getSpecializzazione()   { return specializzazione; }
+}
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/DoctorRepository.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.anagraficaservice.Doctor;
+
+import java.util.UUID;
+
+public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
+}
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/Patient.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Entity
+@Table(name = "patients", schema = "anagrafica_service")
+public class Patient {
+
+    @Id
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id")
+    @MapsId
+    private Citizen citizen;
+
+    private BigDecimal peso;    // kg
+    private BigDecimal altezza; // cm
+
+    protected Patient() {}
+
+    public Patient(Citizen citizen, BigDecimal peso, BigDecimal altezza) {
+        this.citizen = citizen;
+        this.peso    = peso;
+        this.altezza = altezza;
+    }
+
+    /* —— Getters —— */
+    public UUID getId()            { return id; }
+    public Citizen getCitizen()    { return citizen; }
+    public BigDecimal getPeso()    { return peso; }
+    public BigDecimal getAltezza() { return altezza; }
+}
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/PatientRepository.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import tassproject.anagraficaservice.Patient;
+
+import java.util.UUID;
+
+public interface PatientRepository extends JpaRepository<Patient, UUID> {
+}
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/PrescriptionClient.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+
+import java.util.List;
+import java.util.UUID;
+
+@Component
+public class PrescriptionClient {
+
+    private final WebClient web;
+
+    public PrescriptionClient(@Value("${prescription.service.url:http://prescription-service:8080}")
+                              String baseUrl,
+                              WebClient.Builder builder) {
+        this.web = builder.baseUrl(baseUrl).build();
+    }
+
+    /**
+     * Restituisce la lista degli UUID dei pazienti presi in carico dal medico.
+     * GET  /api/v1/doctors/{doctorId}/patients
+     */
+    public List<UUID> patientsOfDoctor(UUID doctorId) {
+        return web.get()
+                .uri("/api/v1/doctors/{id}/patients", doctorId)
+                .retrieve()
+                .bodyToFlux(UUID.class)
+                .collectList()
+                .block();     // ⇢ bloccante per semplicità
+    }
+}
+
+
+### File: anagrafica-service/src/main/java/tassproject/anagraficaservice/SecurityConfig.java
+----------------------------------------
+package tassproject.anagraficaservice;
+
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
+
+import javax.crypto.SecretKey;
+import java.util.List;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    /* —— CORS dev —— */
+    @Bean
+    public CorsFilter corsFilter() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173"));
+        cfg.setAllowedMethods(List.of("*"));
+        cfg.setAllowedHeaders(List.of("*"));
+        cfg.setAllowCredentials(true);
+        var src = new UrlBasedCorsConfigurationSource();
+        src.registerCorsConfiguration("/**", cfg);
+        return new CorsFilter(src);
+    }
+
+    /* —— Resource‑server con JWT —— */
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(req -> req
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+        return http.build();
+    }
+
+    @Bean
+    public JwtDecoder jwtDecoder(@Value("${jwt.secret}") String secret) {
+        byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64.decode(secret);
+        } catch (IllegalArgumentException ex) {
+            keyBytes = secret.getBytes();
+        }
+        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+        return NimbusJwtDecoder.withSecretKey(key).build();
+    }
+}
+
+
 ### File: anagrafica-service/src/main/resources/application.properties
 ----------------------------------------
-spring.application.name=anagrafica-service
+<<ERROR reading file: 'utf-8' codec can't decode byte 0xa0 in position 81: invalid start byte>>
 
 
 ### File: anagrafica-service/src/test/java/tassproject/anagraficaservice/AnagraficaServiceApplicationTests.java
@@ -605,10 +1192,6 @@ class ApiGatewayApplicationTests {
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
     </dependencies>
@@ -4275,6 +4858,7 @@ class PharmaServiceApplicationTests {
         <module>inventory-service</module>
         <module>notification-service</module>
         <module>auth-service</module>
+        <module>anagrafica-service</module>
     </modules>
 
 

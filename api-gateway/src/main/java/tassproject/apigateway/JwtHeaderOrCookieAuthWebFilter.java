@@ -1,10 +1,11 @@
 package tassproject.apigateway;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,7 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class JwtHeaderOrCookieAuthWebFilter implements WebFilter {
 
     private final ReactiveJwtDecoder jwtDecoder;
@@ -38,16 +40,17 @@ public class JwtHeaderOrCookieAuthWebFilter implements WebFilter {
         } else if (cookie != null) {
             token = cookie.getValue();
         }
-        if (token == null) {
+
+        /* —— Se non c’è alcun token proseguiamo senza autenticazione —— */
+        if (token == null || token.isBlank()) {
             return chain.filter(exchange);
         }
 
+        /* —— Decodifica JWT e inserisce Authentication nel contesto —— */
         return jwtDecoder.decode(token)
-                .flatMap(jwt -> converter.convert(jwt))
-                .flatMap(auth ->
-                        chain.filter(exchange)
-                                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth))
-                )
+                .flatMap(converter::convert)
+                .flatMap(auth -> chain.filter(exchange)
+                        .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth)))
                 .onErrorResume(e -> unauthorized(exchange));
     }
 
