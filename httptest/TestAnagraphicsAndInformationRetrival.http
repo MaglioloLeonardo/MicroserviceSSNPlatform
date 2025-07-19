@@ -36,8 +36,8 @@ Accept: application/json
 %}
 
 ### ──── Active Ingredients by Drug ────
-GET http://{{hostname}}:8086/api/v1/drugs/52000000-0000-0000-0000-000000000001
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjozLCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI3OTA5NTEsImV4cCI6MTc1Mjc5NDU1MSwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.TYJ3pLL4Q_gFrJNHo9gPR72lQys2yIqpSWrzsjUbMJU
+GET http://{{hostname}}:8086/api/v1/drugs
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjoxMCwicm9sZSI6WyJET0NUT1IiXSwiaWF0IjoxNzUyOTQ0MzIzLCJleHAiOjE3NTI5NDc5MjMsImNpdGl6ZW5faWQiOiJjOTIwNTQ1NC0wMmEzLTQ3MTItYmIyZi0wNjczMzRhZjJkMDUifQ.hsfo1dnxVFflwvCFZdfTWXR-eHHhnGfJOR7Wl9rxFcY
 Accept: application/json
 
 > {%

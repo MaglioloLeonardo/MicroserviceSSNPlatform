@@ -610,6 +610,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -635,9 +637,22 @@ public class SecurityConfig {
         return new CorsFilter(src);
     }
 
+    /* —— JWT → GrantedAuthorities (“role” → ROLE_*) —— */
+    @Bean
+    public JwtAuthenticationConverter jwtAuthConverter() {
+        JwtGrantedAuthoritiesConverter conv = new JwtGrantedAuthoritiesConverter();
+        conv.setAuthorityPrefix("ROLE_");
+        conv.setAuthoritiesClaimName("role");
+
+        JwtAuthenticationConverter jwtConv = new JwtAuthenticationConverter();
+        jwtConv.setJwtGrantedAuthoritiesConverter(conv);
+        return jwtConv;
+    }
+
     /* —— Resource‑server con JWT —— */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           JwtAuthenticationConverter jwtAuthConverter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -646,10 +661,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))
+                );
         return http.build();
     }
 
+    /* —— Decoder HMAC‑SHA256 —— */
     @Bean
     public JwtDecoder jwtDecoder(@Value("${jwt.secret}") String secret) {
         byte[] keyBytes;
@@ -823,11 +841,12 @@ public class GlobalCorsConfig {
 ----------------------------------------
 package tassproject.apigateway;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 import org.springframework.stereotype.Component;
@@ -837,6 +856,7 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class JwtHeaderOrCookieAuthWebFilter implements WebFilter {
 
     private final ReactiveJwtDecoder jwtDecoder;
@@ -861,16 +881,17 @@ public class JwtHeaderOrCookieAuthWebFilter implements WebFilter {
         } else if (cookie != null) {
             token = cookie.getValue();
         }
-        if (token == null) {
+
+        /* —— Se non c’è alcun token proseguiamo senza autenticazione —— */
+        if (token == null || token.isBlank()) {
             return chain.filter(exchange);
         }
 
+        /* —— Decodifica JWT e inserisce Authentication nel contesto —— */
         return jwtDecoder.decode(token)
-                .flatMap(jwt -> converter.convert(jwt))
-                .flatMap(auth ->
-                        chain.filter(exchange)
-                                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth))
-                )
+                .flatMap(converter::convert)
+                .flatMap(auth -> chain.filter(exchange)
+                        .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth)))
                 .onErrorResume(e -> unauthorized(exchange));
     }
 
@@ -906,22 +927,9 @@ import java.util.Base64;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-    @Bean
-    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        http
-                .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .authorizeExchange(ex -> ex
-                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .pathMatchers("/oauth2/**","/login/**","/api/v1/auth/**","/actuator/**").permitAll()
-                        .anyExchange().authenticated()
-                )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(grantConverter()))
-                )
-                .cors(Customizer.withDefaults());
-        return http.build();
-    }
-
+    /* ───────────────────────────────────────────────────────────────
+     *  JWT → GrantedAuthorities converter
+     * ─────────────────────────────────────────────────────────────── */
     @Bean
     public ReactiveJwtAuthenticationConverterAdapter grantConverter() {
         JwtGrantedAuthoritiesConverter conv = new JwtGrantedAuthoritiesConverter();
@@ -932,18 +940,53 @@ public class SecurityConfig {
         return new ReactiveJwtAuthenticationConverterAdapter(jwtConv);
     }
 
+    /* ───────────────────────────────────────────────────────────────
+     *  JWT Decoder (HMAC‑SHA256) – obbliga la variabile JWT_SECRET
+     * ─────────────────────────────────────────────────────────────── */
     @Bean
     public ReactiveJwtDecoder jwtDecoder(
-            @Value("${jwt.secret:my_jwt_secret}") String secret
+            @Value("${jwt.secret:}") String secretValue            // ← solo env/prop
     ) {
+        if (secretValue == null || secretValue.isBlank()) {
+            throw new IllegalStateException(
+                    "JWT_SECRET non impostato: definiscilo nei parametri di " +
+                            "ambiente o in application.properties/yml");
+        }
+
+        /* prova a decodificare Base64, altrimenti usa raw bytes UTF‑8 */
         byte[] keyBytes;
         try {
-            keyBytes = Base64.getDecoder().decode(secret);
+            keyBytes = Base64.getDecoder().decode(secretValue);
         } catch (IllegalArgumentException ex) {
-            keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+            keyBytes = secretValue.getBytes(StandardCharsets.UTF_8);
         }
         SecretKey key = new SecretKeySpec(keyBytes, "HmacSHA256");
         return NimbusReactiveJwtDecoder.withSecretKey(key).build();
+    }
+
+    /* ───────────────────────────────────────────────────────────────
+     *  Spring Security (WebFlux) filter‑chain
+     * ─────────────────────────────────────────────────────────────── */
+    @Bean
+    public SecurityWebFilterChain springSecurityFilterChain(
+            ServerHttpSecurity http,
+            ReactiveJwtAuthenticationConverterAdapter grantConverter
+    ) {
+        http
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .authorizeExchange(ex -> ex
+                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .pathMatchers("/oauth2/**", "/login/**",
+                                "/api/v1/auth/**", "/actuator/**")
+                        .permitAll()
+                        .anyExchange().authenticated()
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(grantConverter))
+                )
+                .cors(Customizer.withDefaults());
+
+        return http.build();
     }
 }
 
@@ -1041,6 +1084,18 @@ spring:
           predicates:
             - Path=/api/v1/users/**
 
+        # ─────────────  ANAGRAFICA – cittadini  ─────────────
+        - id: anagrafica-citizens
+          uri: ${ANAGRAFICA_SERVICE_URL:http://anagrafica-service:8080}
+          predicates:
+            - Path=/api/v1/citizens/**
+
+        # ─────────────  ANAGRAFICA – pazienti di un medico  ─────────────
+        - id: anagrafica-doctor-patients
+          uri: ${ANAGRAFICA_SERVICE_URL:http://anagrafica-service:8080}
+          predicates:
+            - Path=/api/v1/doctors/*/patients
+
         # ─────────────  PRESCRIPTION  ─────────────
         - id: prescription-service
           uri: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
@@ -1050,6 +1105,14 @@ spring:
             - Path=/api/v1/doctors/**
             - Path=/api/v1/patients/*/drugs/**
             - Path=/api/v1/patients/*/doctors/**
+
+        # ─────────────  PHARMA  ─────────────
+        - id: pharma-service
+          uri: ${PHARMA_SERVICE_URL:http://pharma-service:8080}
+          predicates:
+            - Path=/api/v1/drugs/**
+            - Path=/api/v1/active-ingredients/**
+            - Path=/api/v1/pharma-families/**
 
         # ─────────────  DISPENSATION  ─────────────
         - id: dispensation-service

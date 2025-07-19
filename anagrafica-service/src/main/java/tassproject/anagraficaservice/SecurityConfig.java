@@ -12,6 +12,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -37,9 +39,22 @@ public class SecurityConfig {
         return new CorsFilter(src);
     }
 
+    /* —— JWT → GrantedAuthorities (“role” → ROLE_*) —— */
+    @Bean
+    public JwtAuthenticationConverter jwtAuthConverter() {
+        JwtGrantedAuthoritiesConverter conv = new JwtGrantedAuthoritiesConverter();
+        conv.setAuthorityPrefix("ROLE_");
+        conv.setAuthoritiesClaimName("role");
+
+        JwtAuthenticationConverter jwtConv = new JwtAuthenticationConverter();
+        jwtConv.setJwtGrantedAuthoritiesConverter(conv);
+        return jwtConv;
+    }
+
     /* —— Resource‑server con JWT —— */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           JwtAuthenticationConverter jwtAuthConverter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -48,10 +63,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))
+                );
         return http.build();
     }
 
+    /* —— Decoder HMAC‑SHA256 —— */
     @Bean
     public JwtDecoder jwtDecoder(@Value("${jwt.secret}") String secret) {
         byte[] keyBytes;
