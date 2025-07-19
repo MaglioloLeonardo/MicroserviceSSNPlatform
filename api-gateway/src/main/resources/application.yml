@@ -70,9 +70,9 @@ spring:
         - id: pharma-service
           uri: ${PHARMA_SERVICE_URL:http://pharma-service:8080}
           predicates:
-            - Path=/api/v1/drugs/**
-            - Path=/api/v1/active-ingredients/**
-            - Path=/api/v1/pharma-families/**
+            - Path=/api/v1/drugs,/api/v1/drugs/**,
+              /api/v1/active-ingredients/**,
+              /api/v1/pharma-families/**
 
         # ─────────────  DISPENSATION  ─────────────
         - id: dispensation-service
