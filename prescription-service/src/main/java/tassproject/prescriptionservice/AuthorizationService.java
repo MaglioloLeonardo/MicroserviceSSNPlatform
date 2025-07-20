@@ -45,25 +45,30 @@ public class AuthorizationService {
        Checks
        ------------------------------------------------------------------ */
 
-    /** Verifica che chi chiede dati del paziente ne abbia diritto. */
+    /**
+     * Verifica che chi chiede o modifica dati del paziente ne abbia diritto.
+     * <ul>
+     *   <li>Il paziente può vedere solo sé stesso.</li>
+     *   <li>Qualsiasi medico e l’amministratore possono operare su qualunque paziente.</li>
+     *   <li>Il farmacista non può accedere ai dati clinici del paziente.</li>
+     * </ul>
+     */
     public void assertCanAccessPatient(@Nonnull UUID patientId) {
         switch (role()) {
             case "ROLE_PATIENT" -> {
                 if (!userId().equals(patientId))
                     deny("Puoi accedere solo alle tue informazioni.");
             }
-            case "ROLE_DOCTOR" -> {
-                if (!prescriptions.existsByDoctorIdAndPatientId(userId(), patientId))
-                    deny("Non sei il medico di questo paziente.");
-            }
+            case "ROLE_DOCTOR", "ROLE_ADMIN" -> { /* sempre permesso */ }
             case "ROLE_PHARMACIST" -> deny("Un farmacista non può leggere dati clinici del paziente.");
-            case "ROLE_ADMIN" -> { /* sempre permesso */ }
             default -> deny("Ruolo non riconosciuto.");
         }
     }
 
-    /** Verifica che chi chiede dati del medico sia il medico stesso
-     oppure un suo paziente. */
+    /**
+     * Verifica che chi chiede dati del medico sia il medico stesso
+     * oppure un suo paziente.
+     */
     public void assertCanAccessDoctor(@Nonnull UUID doctorId) {
         switch (role()) {
             case "ROLE_DOCTOR" -> {
