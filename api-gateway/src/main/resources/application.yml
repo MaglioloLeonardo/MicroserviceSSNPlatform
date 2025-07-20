@@ -7,6 +7,9 @@ spring:
 
   cloud:
     gateway:
+      ###############################
+      #  CORS DEV (SPA localhost)   #
+      ###############################
       globalcors:
         corsConfigurations:
           "[/**]":
@@ -15,6 +18,9 @@ spring:
             allowedHeaders: "*"
             allowCredentials: true
 
+      ###############################################
+      #  ROUTE DEFINITIONS ‑ **una per microservizio** #
+      ###############################################
       routes:
 
         # ─────────────  OAUTH2 GOOGLE  ─────────────
@@ -22,15 +28,13 @@ spring:
           uri: http://auth-service:8080
           predicates:
             - Path=/oauth2/authorization/google
-          filters:
-            - PreserveHostHeader
+          filters: [PreserveHostHeader]
 
         - id: oauth2-callback
           uri: http://auth-service:8080
           predicates:
             - Path=/login/oauth2/**
-          filters:
-            - PreserveHostHeader
+          filters: [PreserveHostHeader]
 
         # ─────────────  AUTH REST  ─────────────
         - id: auth-service
@@ -44,33 +48,30 @@ spring:
           predicates:
             - Path=/api/v1/users/**
 
-        # ─────────────  ANAGRAFICA – cittadini  ─────────────
-        - id: anagrafica-citizens
+        # ─────────────  ANAGRAFICA  ─────────────
+        - id: anagrafica-service
           uri: ${ANAGRAFICA_SERVICE_URL:http://anagrafica-service:8080}
           predicates:
-            - Path=/api/v1/citizens/**
-
-        # ─────────────  ANAGRAFICA – pazienti di un medico  ─────────────
-        - id: anagrafica-doctor-patients
-          uri: ${ANAGRAFICA_SERVICE_URL:http://anagrafica-service:8080}
-          predicates:
-            - Path=/api/v1/doctors/*/patients
+            - Path=/api/v1/citizens/**,
+              /api/v1/doctors/*/patients
 
         # ─────────────  PRESCRIPTION  ─────────────
         - id: prescription-service
           uri: ${PRESCRIPTION_SERVICE_URL:http://prescription-service:8080}
           predicates:
-            - Path=/api/v1/prescriptions/**
-            - Path=/api/v1/patients/*/prescriptions/**
-            - Path=/api/v1/doctors/**
-            - Path=/api/v1/patients/*/drugs/**
-            - Path=/api/v1/patients/*/doctors/**
+            - Path=/api/v1/prescriptions,
+              /api/v1/prescriptions/**,
+              /api/v1/patients/*/prescriptions/**,
+              /api/v1/doctors/**,
+              /api/v1/patients/*/drugs/**,
+              /api/v1/patients/*/doctors/**
 
         # ─────────────  PHARMA  ─────────────
         - id: pharma-service
           uri: ${PHARMA_SERVICE_URL:http://pharma-service:8080}
           predicates:
-            - Path=/api/v1/drugs,/api/v1/drugs/**,
+            - Path=/api/v1/drugs,
+              /api/v1/drugs/**,
               /api/v1/active-ingredients/**,
               /api/v1/pharma-families/**
 
@@ -78,10 +79,10 @@ spring:
         - id: dispensation-service
           uri: ${DISPENSATION_SERVICE_URL:http://dispensation-service:8080}
           predicates:
-            - Path=/api/v1/dispensations/**
-            - Path=/api/v1/prescriptions/*/dispensations/**
-            - Path=/api/v1/pharmacists/**
-            - Path=/api/v1/patients/*/pharmacists/**
+            - Path=/api/v1/dispensations/**,
+              /api/v1/prescriptions/*/dispensations/**,
+              /api/v1/pharmacists/**,
+              /api/v1/patients/*/pharmacists/**
 
         # ─────────────  INVENTORY  ─────────────
         - id: inventory-service
@@ -95,6 +96,9 @@ spring:
           predicates:
             - Path=/api/v1/notifications/**
 
+      ########################
+      #  FILTRI DI DEFAULT   #
+      ########################
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
         - PreserveHostHeader
