@@ -1,0 +1,558 @@
+#───────────────────────────────  VOLUMES  ──────────────────────────────#
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgdata
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmqdata
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+#───────────────────────────────  POSTGRES  ─────────────────────────────#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+data:
+  POSTGRES_DB: mydatabase
+  POSTGRES_USER: myuser
+  POSTGRES_PASSWORD: secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: secret
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+data:
+  init-schemas.sql: |-
+    -- Inserisci qui il contenuto reale di postgres-init/init-schemas.sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17.5
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-config
+            - secretRef:
+                name: postgres-secret
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d/init-schemas.sql
+              subPath: init-schemas.sql
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "myuser", "-d", "mydatabase"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "myuser", "-d", "mydatabase"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim:
+            claimName: pgdata
+        - name: init-script
+          configMap:
+            name: postgres-init-script
+---
+#──────────────────────────────  RABBITMQ  ──────────────────────────────#
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+spec:
+  ports:
+    - port: 5672
+      targetPort: 5672
+    - port: 15672
+      targetPort: 15672
+      name: management
+  selector:
+    app: rabbitmq
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: myuser
+            - name: RABBITMQ_DEFAULT_PASS
+              value: secret
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+          volumeMounts:
+            - name: rabbitmqdata
+              mountPath: /var/lib/rabbitmq
+          readinessProbe:
+            exec:
+              command: ["rabbitmqctl", "status"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: rabbitmqdata
+          persistentVolumeClaim:
+            claimName: rabbitmqdata
+---
+#─────────────────────────────  API-GATEWAY  ────────────────────────────#
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+spec:
+  type: NodePort
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
+  selector:
+    app: api-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: tassproject/api-gateway:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JWT_SECRET
+              value: XQbpeStl7k3jq0WFDYpjfudEwpm/0D0j/H2t3uFX3FA=
+            - name: JWT_EXPIRATION_MS
+              value: "3600000"
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/mydatabase
+            - name: SPRING_DATASOURCE_USERNAME
+              value: myuser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: secret
+            - name: SPRING_RABBITMQ_HOST
+              value: rabbitmq
+            - name: SPRING_RABBITMQ_USERNAME
+              value: myuser
+            - name: SPRING_RABBITMQ_PASSWORD
+              value: secret
+            - name: SERVER_PORT
+              value: "8080"
+---
+#─────────────────────────  PRESCRIPTION-SERVICE  ───────────────────────#
+apiVersion: v1
+kind: Service
+metadata:
+  name: prescription-service
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: prescription-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prescription-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prescription-service
+  template:
+    metadata:
+      labels:
+        app: prescription-service
+    spec:
+      containers:
+        - name: prescription-service
+          image: tassproject/prescription-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JWT_SECRET
+              value: XQbpeStl7k3jq0WFDYpjfudEwpm/0D0j/H2t3uFX3FA=
+            - name: JWT_EXPIRATION_MS
+              value: "3600000"
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/mydatabase
+            - name: SPRING_DATASOURCE_USERNAME
+              value: myuser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: secret
+            - name: SPRING_RABBITMQ_HOST
+              value: rabbitmq
+            - name: SPRING_RABBITMQ_USERNAME
+              value: myuser
+            - name: SPRING_RABBITMQ_PASSWORD
+              value: secret
+---
+#─────────────────────────  DISPENSATION-SERVICE  ───────────────────────#
+apiVersion: v1
+kind: Service
+metadata:
+  name: dispensation-service
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: dispensation-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dispensation-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dispensation-service
+  template:
+    metadata:
+      labels:
+        app: dispensation-service
+    spec:
+      containers:
+        - name: dispensation-service
+          image: tassproject/dispensation-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JWT_SECRET
+              value: XQbpeStl7k3jq0WFDYpjfudEwpm/0D0j/H2t3uFX3FA=
+            - name: JWT_EXPIRATION_MS
+              value: "3600000"
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/mydatabase
+            - name: SPRING_DATASOURCE_USERNAME
+              value: myuser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: secret
+            - name: SPRING_RABBITMQ_HOST
+              value: rabbitmq
+            - name: SPRING_RABBITMQ_USERNAME
+              value: myuser
+            - name: SPRING_RABBITMQ_PASSWORD
+              value: secret
+---
+#──────────────────────────  INVENTORY-SERVICE  ─────────────────────────#
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: inventory-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-service
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+    spec:
+      containers:
+        - name: inventory-service
+          image: tassproject/inventory-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JWT_SECRET
+              value: XQbpeStl7k3jq0WFDYpjfudEwpm/0D0j/H2t3uFX3FA=
+            - name: JWT_EXPIRATION_MS
+              value: "3600000"
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/mydatabase
+            - name: SPRING_DATASOURCE_USERNAME
+              value: myuser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: secret
+---
+#─────────────────────────  NOTIFICATION-SERVICE  ───────────────────────#
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: notification-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: tassproject/notification-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JWT_SECRET
+              value: XQbpeStl7k3jq0WFDYpjfudEwpm/0D0j/H2t3uFX3FA=
+            - name: JWT_EXPIRATION_MS
+              value: "3600000"
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/mydatabase
+            - name: SPRING_DATASOURCE_USERNAME
+              value: myuser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: secret
+            - name: SPRING_RABBITMQ_HOST
+              value: rabbitmq
+            - name: SPRING_RABBITMQ_USERNAME
+              value: myuser
+            - name: SPRING_RABBITMQ_PASSWORD
+              value: secret
+---
+#─────────────────────────────  AUTH-SERVICE  ───────────────────────────#
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: auth-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          image: tassproject/auth-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/mydatabase
+            - name: SPRING_DATASOURCE_USERNAME
+              value: myuser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: secret
+            - name: SPRING_RABBITMQ_HOST
+              value: rabbitmq
+            - name: SPRING_RABBITMQ_USERNAME
+              value: myuser
+            - name: SPRING_RABBITMQ_PASSWORD
+              value: secret
+            - name: JWT_SECRET
+              value: XQbpeStl7k3jq0WFDYpjfudEwpm/0D0j/H2t3uFX3FA=
+            - name: JWT_EXPIRATION_MS
+              value: "3600000"
+            - name: GOOGLE_CLIENT_ID
+              value: "__fill__"
+            - name: GOOGLE_CLIENT_SECRET
+              value: "__fill__"
+            - name: SERVER_PORT
+              value: "8080"
+---
+#─────────────────────────────  PHARMA-SERVICE  ─────────────────────────#
+apiVersion: v1
+kind: Service
+metadata:
+  name: pharma-service
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: pharma-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pharma-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pharma-service
+  template:
+    metadata:
+      labels:
+        app: pharma-service
+    spec:
+      containers:
+        - name: pharma-service
+          image: tassproject/pharma-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/mydatabase
+            - name: SPRING_DATASOURCE_USERNAME
+              value: myuser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: secret
+            - name: SPRING_RABBITMQ_HOST
+              value: rabbitmq
+            - name: SPRING_RABBITMQ_USERNAME
+              value: myuser
+            - name: SPRING_RABBITMQ_PASSWORD
+              value: secret
+            - name: JWT_SECRET
+              value: XQbpeStl7k3jq0WFDYpjfudEwpm/0D0j/H2t3uFX3FA=
+            - name: JWT_EXPIRATION_MS
+              value: "3600000"
+            - name: SERVER_PORT
+              value: "8080"
+---
+#─────────────────────────────  ANAGRAFICA-SERVICE  ─────────────────────#
+apiVersion: v1
+kind: Service
+metadata:
+  name: anagrafica-service
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: anagrafica-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anagrafica-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: anagrafica-service
+  template:
+    metadata:
+      labels:
+        app: anagrafica-service
+    spec:
+      containers:
+        - name: anagrafica-service
+          image: tassproject/anagrafica-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/mydatabase
+            - name: SPRING_DATASOURCE_USERNAME
+              value: myuser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: secret
+            - name: SPRING_RABBITMQ_HOST
+              value: rabbitmq
+            - name: SPRING_RABBITMQ_USERNAME
+              value: myuser
+            - name: SPRING_RABBITMQ_PASSWORD
+              value: secret
+            - name: JWT_SECRET
+              value: XQbpeStl7k3jq0WFDYpjfudEwpm/0D0j/H2t3uFX3FA=
+            - name: JWT_EXPIRATION_MS
+              value: "3600000"
+            - name: SERVER_PORT
+              value: "8080"

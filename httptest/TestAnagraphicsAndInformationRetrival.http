@@ -15,17 +15,18 @@ title Tests HTTP diretti ai microservizi aggiunti
 
 ### 3) Chi sono? → `/api/v1/auth/me`
 GET http://{{hostname}}:8080/api/v1/citizens/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjo1LCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI4NTgwODQsImV4cCI6MTc1Mjg2MTY4NCwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.tpDAp-eCIAdlXMoIjTaGnras3qm_w2OPH-96gLJxcCM
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AZW1haWwuaXQiLCJ2ZXIiOjEsInJvbGUiOlsiRE9DVE9SIl0sImlhdCI6MTc1MzE1NDQzNSwiZXhwIjoxNzUzMTU4MDM1LCJjaXRpemVuX2lkIjoiZDlhZDFiMzktNGQwNC00MzFlLTk1MGYtMTQwNDQxYzVmMjhjIn0.hNzaqVcwJWyGXaGTWpccZSxIQ5F_iByVxbwXlLvsnyQ
 Accept: application/json
 
 ### ─────────── Patients Details (Doctor) ───────────
-GET http://{{hostname}}:{{prescPort}}/api/v1/doctors/{{doctorId}}/patients/details
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjoxLCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI3Njg2NDIsImV4cCI6MTc1Mjc3MjI0MiwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.4vzDZFouUdhw0U9lePxnKvwxLIJtHRpEtsStc0DQBo4
+GET http://{{hostname}}:{{prescPort}}/api/v1/doctors/d9ad1b39-4d04-431e-950f-140441c5f28c/patients/details
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AZW1haWwuaXQiLCJ2ZXIiOjEsInJvbGUiOlsiRE9DVE9SIl0sImlhdCI6MTc1MzE1NDQzNSwiZXhwIjoxNzUzMTU4MDM1LCJjaXRpemVuX2lkIjoiZDlhZDFiMzktNGQwNC00MzFlLTk1MGYtMTQwNDQxYzVmMjhjIn0.hNzaqVcwJWyGXaGTWpccZSxIQ5F_iByVxbwXlLvsnyQ
 Accept: application/json
+
 
 ### ─────────── Me ───────────
 GET http://localhost:8080/api/v1/auth/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AbWVkaWNvLml0IiwidmVyIjoxLCJyb2xlIjpbIkRPQ1RPUiJdLCJpYXQiOjE3NTI3Njg2NDIsImV4cCI6MTc1Mjc3MjI0MiwiY2l0aXplbl9pZCI6ImM5MjA1NDU0LTAyYTMtNDcxMi1iYjJmLTA2NzMzNGFmMmQwNSJ9.4vzDZFouUdhw0U9lePxnKvwxLIJtHRpEtsStc0DQBo4Accept
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZWRpY29AZW1haWwuaXQiLCJ2ZXIiOjEsInJvbGUiOlsiRE9DVE9SIl0sImlhdCI6MTc1MzE1NDQzNSwiZXhwIjoxNzUzMTU4MDM1LCJjaXRpemVuX2lkIjoiZDlhZDFiMzktNGQwNC00MzFlLTk1MGYtMTQwNDQxYzVmMjhjIn0.hNzaqVcwJWyGXaGTWpccZSxIQ5F_iByVxbwXlLvsnyQ
 Accept: application/json
 
 
