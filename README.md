@@ -1,6 +1,6 @@
 # TASSProject – Backend
 
-Monorepo containing every backend component for **TASSProject**, a micro-service platform built with Spring Boot, PostgreSQL and RabbitMQ.
+Monorepo containing every backend component for **TASSProject**, a micro-service platform built with Spring Boot, PostgreSQL
 Use `docker-compose` for local hacking or deploy the very same stack to Minikube/Kubernetes with the provided manifest.
 
 ---
@@ -27,8 +27,7 @@ Use `docker-compose` for local hacking or deploy the very same stack to Minikube
 ## Overview
 
 The backend is split into multiple Spring Boot services, each isolated in its own Maven module and Docker image.
-Services communicate synchronously over HTTP (via an API-Gateway) and asynchronously through RabbitMQ events.
-
+Services communicate synchronously over HTTP (via an API-Gateway) 
 ---
 
 ## Architecture
@@ -49,11 +48,11 @@ Services communicate synchronously over HTTP (via an API-Gateway) and asynchrono
 └───────────┬──────────┘
             │
 ┌───────────▼──────────┐
-│ prescription-service │───┐
-└───────────┬──────────┘   │ RabbitMQ
-            │              │
-┌───────────▼──────────┐   │
-│ dispensation-service │<──┘
+│ prescription-service │
+└───────────┬──────────┘   
+            │             
+┌───────────▼──────────┐  
+│ dispensation-service │
 └───────────┬──────────┘
             │
 ┌───────────▼──────────┐
@@ -62,7 +61,6 @@ Services communicate synchronously over HTTP (via an API-Gateway) and asynchrono
 ```
 
 * **PostgreSQL 17** for persistent storage (schemas per service).
-* **RabbitMQ 3** (management UI exposed) for event distribution.
 * **Docker volumes** keep data across restarts.
 * **Health-checks** for every service ensure correct start-up ordering.
 
@@ -74,7 +72,6 @@ Services communicate synchronously over HTTP (via an API-Gateway) and asynchrono
 | ----------------- | ----------------------------------------------------------------- |
 | Language          | Java 17                                                           |
 | Frameworks        | Spring Boot 3, Spring Security, Spring Data, Spring Cloud Gateway |
-| Messaging         | RabbitMQ 3 (management plugin)                                    |
 | Database          | PostgreSQL 17                                                     |
 | Build             | Maven + Docker                                                    |
 | Container Runtime | Docker Engine / containerd                                        |
@@ -129,7 +126,6 @@ docker compose down -v
 | Service                   | Host Port    |
 | ------------------------- | ------------ |
 | PostgreSQL                | 5432         |
-| RabbitMQ (AMQP / UI)      | 5672 / 15672 |
 | api-gateway (entry-point) | 8080         |
 | prescription-service      | 8081         |
 | dispensation-service      | 8082         |
@@ -178,10 +174,9 @@ minikube service api-gateway --url
 
 The manifest includes:
 
-* **PersistentVolumeClaims** for Postgres (`10 Gi`) and RabbitMQ.
 * **Deployments + Services** (ClusterIP) for every backend module.
 * **ConfigMaps** for non-secret configs (e.g. SQL bootstrap).
-* **Secrets** for DB/Rabbit/JWT credentials.
+* **Secrets** for DB/JWT credentials.
 
 > Update image names or tags if you push to an external registry.
 
@@ -195,7 +190,6 @@ The manifest includes:
 | `POSTGRES_PASSWORD`          | `secret`            | DB password             |
 | `JWT_SECRET`                 | `my_jwt_secret`     | 256-bit HMAC key        |
 | `JWT_EXPIRATION_MS`          | `3600000`           | Token lifetime (ms)     |
-| `RABBITMQ_DEFAULT_USER/PASS` | `myuser` / `secret` | RabbitMQ credentials    |
 | `GOOGLE_CLIENT_ID/SECRET`    | *unset*             | OAuth2 for auth-service |
 
 In production **replace every default** via environment variables or external Secrets.
@@ -227,7 +221,6 @@ Hibernate runs in `update` mode during dev; switch to `validate` (or disable) in
 ## Health & Monitoring
 
 * `/actuator/health` exposed on every Spring Boot service (used by Docker HC and K8s probes).
-* RabbitMQ UI: [http://localhost:15672](http://localhost:15672) (user/pass as above).
 * Add Prometheus/Grafana by enabling the **micrometer** actuator endpoints (not included here).
 
 ---
@@ -235,7 +228,7 @@ Hibernate runs in `update` mode during dev; switch to `validate` (or disable) in
 ## Testing
 
 * Unit + integration tests live under `src/test`.
-* Every JPA service ships Testcontainers for Postgres/Rabbit tests.
+* Every JPA service ships Testcontainers for Postgres
 * CI pipeline not included; feel free to plug in GitHub Actions.
 
 ---
@@ -246,7 +239,6 @@ Hibernate runs in `update` mode during dev; switch to `validate` (or disable) in
 | ------------------------------------ | --------------------------------------------------------- |
 | Service stuck in `CrashLoopBackOff`  | `kubectl logs <pod>` – most common is wrong DB credential |
 | Gateway returns 401 for all requests | Ensure identical `JWT_SECRET` in gateway + services       |
-| RabbitMQ queue not created           | Verify service connected with correct user/pass           |
 | DB migrations not applied            | Look at `init-schemas.sql` mount path & permissions       |
 | DNS resolution fails in cluster      | `kubectl exec -it <pod> -- nslookup prescription-service` |
 
